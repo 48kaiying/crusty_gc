@@ -1,15 +1,12 @@
-// Build Instructions
-// 1. cargo build
-// gcc -g application.c -o app -lrustgc -L./target/debug
-
 #include <stdio.h>
-
-// Functions called in the Rust library
-extern void rust_test();
+#include "rustgc.h"
 
 int main()
 {
-    printf("hello!\n");
+    printf("Sample C Application!\n");
     rust_test();
+    int x = rust_test2(10);
+    printf("Expected 11 = %d\n", x);
+    rust_string("Hello there");
     return 0;
 }
