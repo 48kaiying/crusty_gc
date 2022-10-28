@@ -24,7 +24,14 @@ pub extern "C" fn rgc_init() {
 }
 
 #[no_mangle]
-pub extern "C" fn rgc_malloc(_size: isize) -> *mut u8{
-    return 0 as *mut u8;
+pub extern "C" fn rgc_malloc(size: isize) -> *mut u8 {
+    println!("rgc malloc requested {}", size);
+    let mut buf = vec![0; 512].into_boxed_slice();
+    let data = buf.as_mut_ptr();
+    // let len = buf.len();
+    std::mem::forget(buf);
     // return allocation pointer
+    return data as *mut u8;
+    // Buffer { data, len }
+    // return 0 as *mut u8;
 }
