@@ -1,7 +1,6 @@
-// struct Header {
-//     size : u64, // allocation size in bytes
-//     next : Header   
-// }
+#[macro_use] extern crate lazy_static;
+
+mod allocator;
 
 fn main() {
     let mut x = 5; 
@@ -17,8 +16,7 @@ fn main() {
 
     println!("Hello, world!");
 
-    // let f = Header {
-    //     size = 48
-        
-    // }
+    allocator::alloc_init();
+
+    println!("Done!");
 }
