@@ -5,3 +5,4 @@ extern void rust_string(char *);
 
 extern void rgc_init();
 extern char *rgc_malloc(unsigned long);
+extern void rgc_free(char *);

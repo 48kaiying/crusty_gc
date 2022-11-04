@@ -20,7 +20,7 @@ int main()
     rgc_init();
 
     char *cptr;
-    char test[] = {'h', 'e', 'n', 'c', 'h', 'e', 'n', '\0'};
+    char test[] = {'d', 'u', 'c', 'k', 'y', '\0'};
     printf("Size of test = %lu\n", sizeof(test));
 
     cptr = rgc_malloc(sizeof(test));
@@ -33,6 +33,8 @@ int main()
         *temp = test[i];
         temp++;
     }
+
+    rgc_free(cptr);
 
     printf("cptr = %s\n", cptr);
 
