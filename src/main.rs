@@ -1,6 +1,7 @@
 #[macro_use] extern crate lazy_static;
 
 mod allocator;
+mod tests; 
 
 fn main() {
     let mut x = 5; 
@@ -17,6 +18,7 @@ fn main() {
     println!("Hello, world!");
 
     allocator::alloc_init();
+    // test::basics();
 
     println!("Done!");
 }
