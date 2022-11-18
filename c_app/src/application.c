@@ -41,7 +41,7 @@ int main()
     printf("cptr = %s\n", cptr);
 
     printf("#################### Test 2 ####################\n");
-    int count = 100;
+    int count = 400;
     int *int_arr = (int *)(rgc_malloc(sizeof(int) * count));
 
     if (int_arr)

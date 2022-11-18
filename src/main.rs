@@ -16,7 +16,6 @@ fn main() {
     println!("Hello, world!");
 
     allocator::alloc_init();
-    // test::basics();
-
+    
     println!("Done!");
 }

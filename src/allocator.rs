@@ -2,7 +2,7 @@ use std::sync::Mutex;
 // use std::mem; 
 
 // 1 KB block = 1024 / word
-const MIN_BLOCK_SIZE : usize = 512; 
+// const MIN_BLOCK_SIZE : usize = 512;
 // const 1b : usize = 1024; 
 
 lazy_static::lazy_static! {
@@ -16,9 +16,32 @@ struct Allocator {
     head: Option<Box<Block>>,
 }
 
+
+fn get_block_size(size : usize) -> usize {
+    let min_block_size = 521;  // 0.5 KB
+    let s1kb = min_block_size * 2; 
+    let s2kb = s1kb * 2; 
+    let s4kb = s2kb * 2; 
+    let s8kb = s4kb * 2; 
+    let s32kb = s8kb * 2; 
+    let s64kb = s32kb * 2;
+    let s128kb = s64kb * 2;
+    let sizes : [usize; 8] = 
+        [min_block_size, s1kb, s2kb, s4kb, s8kb, s32kb, s64kb, s128kb]; 
+
+    for s in sizes {
+        if size < s {
+            println!("Returning size {}", s);
+            return s;
+        }
+    }
+
+    unimplemented!("Requested size is too large");
+}
+
 impl Allocator {
 
-    fn new() -> Allocator {
+    pub fn new() -> Allocator {
         Allocator {
             num_used : 0, 
             num_free : 0, 
@@ -26,10 +49,10 @@ impl Allocator {
         }
     }
 
-    pub fn malloc(&mut self, size : usize) -> *mut u8 {
+    fn malloc(&mut self, size : usize) -> *mut u8 {
         // TODO: figure out block sizes
         // 0.5KB, 1KB, 2KB, etc.. 
-        let m_size : usize = MIN_BLOCK_SIZE; 
+        let m_size : usize = get_block_size(size); 
 
         let mem : Vec<u8> = vec![0; m_size];
         let mut payload = mem.into_boxed_slice();
@@ -63,7 +86,7 @@ impl Allocator {
         }
     }
 
-    pub fn free(&mut self, ptr : *mut u8) {
+    fn free(&mut self, ptr : *mut u8) {
         println!("alloc free");
 
         // let mut found_match = false; 
