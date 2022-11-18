@@ -1,6 +1,44 @@
+use std::mem; 
+
+pub struct List {
+    head: Option<Box<Node>>
+}
+
+struct Node {
+    elem: i32, 
+    next: Option<Box<Node>>
+}
+
+impl List {
+    pub fn new() -> Self {
+        List { head : None }
+    }
+
+    pub fn push(&mut self, elem: i32) {
+        let new_node = Box::new(Node {
+            elem: elem, 
+            next: mem::replace(&mut self.head, None)
+        }); 
+
+        self.head = Some(new_node)
+    }
+
+    pub fn pop(&mut self) -> Option<i32> {
+        match mem::replace(&mut self.head, None) {
+            None => {
+                return None;
+            }
+            Some(node) => {
+                self.head = node.next;
+                return Some(node.elem);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::allocator::List; 
+    use super::List; 
     
     #[test]
     fn basics() {
