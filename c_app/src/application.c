@@ -79,7 +79,6 @@ int main()
     printf("#################### Test 4 ####################\n");
 
     rgc_free((char *)int_arr);
-    rgc_free((char *)int_arr);
 
     printf("End of c prog\n");
     return 0;
