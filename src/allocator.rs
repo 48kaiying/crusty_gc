@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-// use std::mem; 
+use std::mem; 
 
 // 1 KB block = 1024 / word
 // const MIN_BLOCK_SIZE : usize = 512;
@@ -10,12 +10,29 @@ lazy_static::lazy_static! {
         Mutex::new(Allocator::new());
 }
 
+struct Header {
+    size: usize,
+    request_size: usize,
+    used: bool,
+}
+
+struct Block {
+    size: usize,
+    request_size: usize,  
+    used: bool,
+    payload: *mut u8,
+    next: Option<Box<Block>>
+}
+
+unsafe impl Send for Block {}
+unsafe impl Sync for Block {}
+
 struct Allocator {
     num_used: usize, 
     num_free: usize, 
     head: Option<Box<Block>>,
+    blocks: Vec<Block>
 }
-
 
 fn get_block_size(size : usize) -> usize {
     let min_block_size = 521;  // 0.5 KB
@@ -39,17 +56,49 @@ fn get_block_size(size : usize) -> usize {
     unimplemented!("Requested size is too large");
 }
 
+
 impl Allocator {
 
     pub fn new() -> Allocator {
         Allocator {
             num_used : 0, 
             num_free : 0, 
-            head : None
+            head : None,
+            blocks : Vec::new(),
         }
     }
 
     fn malloc(&mut self, size : usize) -> *mut u8 {
+        let m_size : usize = get_block_size(size); 
+
+        let header_size = mem::size_of::<Header>(); 
+        println!("header size {}", header_size);
+        println!("usize size {}", mem::size_of::<usize>());
+        println!("bool size {}", mem::size_of::<bool>());
+
+        let mem : Vec<u8> = vec![0; m_size];
+        let mut payload = mem.into_boxed_slice();
+        let payload_ptr = payload.as_mut_ptr();
+
+        // don't drop memory when var out of scope 
+        std::mem::forget(payload);
+
+        // TODO: move block info onto payload return block - offset
+        let new_block = 
+            Block {
+                size : m_size, 
+                request_size: size,
+                used : true,
+                payload : payload_ptr,
+                next : None,
+            };
+
+        self.blocks.push(new_block);
+        
+        return payload_ptr;
+    }
+
+    fn malloc_ll(&mut self, size : usize) -> *mut u8 {
         // TODO: figure out block sizes
         // 0.5KB, 1KB, 2KB, etc.. 
         let m_size : usize = get_block_size(size); 
@@ -141,17 +190,6 @@ impl Allocator {
     }
 }
 
-struct Block {
-    size: usize,
-    request_size: usize,  
-    used: bool,
-    payload: *mut u8,
-    next: Option<Box<Block>>
-}
-
-unsafe impl Send for Block {}
-unsafe impl Sync for Block {}
-
 // fn inc() -> usize {
 //     let mut guard = ALLOCATOR.lock().unwrap();
 //     (*guard).num_used += 1;
@@ -180,19 +218,5 @@ pub fn alloc_init() {
     // Assert for 64bit arch
     assert_eq!(usize::MAX, 18446744073709551615, "Expected arch 64");
     println!("Initializing  Allocator");
-
-    // let mut x = inc();
-    // x = inc();
-    // x = inc();
-    // x = inc();
-    // println!("val {}", x);
-
-    // add block to allocator
-    // let mut p = &(*guard).base.next;
-    // let mut q = &(*guard).base.next;
-    // while q.is_some() && q.as_ref().unwrap().next.is_some() {
-    //     p = &(p.as_ref().unwrap().next);
-    //     q = &(q.as_ref().unwrap().next.as_ref().unwrap().next);
-    // }
 }
 
