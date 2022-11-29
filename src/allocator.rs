@@ -4,25 +4,18 @@ use std::mem;
 // 1 KB block = 1024 / word
 // const MIN_BLOCK_SIZE : usize = 512;
 // const 1b : usize = 1024;
-const HEADER_SIZE : usize = mem::size_of::<Header>(); 
 
 lazy_static::lazy_static! {
     static ref ALLOCATOR : Mutex<Allocator> = 
         Mutex::new(Allocator::new());
 }
 
-struct Header {
-    size: usize,
-    request_size: usize,
-    used: bool,
-}
-
 struct Block {
+    // header size = 24
     size: usize,
     request_size: usize,  
     used: bool,
     payload: *mut u8,
-    next: Option<Box<Block>>
 }
 
 unsafe impl Send for Block {}
@@ -31,7 +24,6 @@ unsafe impl Sync for Block {}
 struct Allocator {
     num_used: usize, 
     num_free: usize, 
-    head: Option<Box<Block>>,
     blocks: Vec<Block>
 }
 
@@ -64,7 +56,6 @@ impl Allocator {
         Allocator {
             num_used : 0, 
             num_free : 0, 
-            head : None,
             blocks : Vec::new(),
         }
     }
@@ -72,12 +63,6 @@ impl Allocator {
     fn malloc(&mut self, size : usize) -> *mut u8 {
         println!("alloc malloc");
         let m_size : usize = get_block_size(size); 
-
-        let header_size = mem::size_of::<Header>(); 
-        println!("header size {}", header_size);
-        // println!("usize size {}", mem::size_of::<usize>());
-        // println!("bool size {}", mem::size_of::<bool>());
-
         let mem : Vec<u8> = vec![0; m_size];
         let mut payload = mem.into_boxed_slice();
         let payload_ptr = payload.as_mut_ptr();
@@ -92,7 +77,6 @@ impl Allocator {
                 request_size: size,
                 used : true,
                 payload : payload_ptr,
-                next : None,
             };
 
         self.blocks.push(new_block);
