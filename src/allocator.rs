@@ -3,7 +3,8 @@ use std::mem;
 
 // 1 KB block = 1024 / word
 // const MIN_BLOCK_SIZE : usize = 512;
-// const 1b : usize = 1024; 
+// const 1b : usize = 1024;
+const HEADER_SIZE : usize = mem::size_of::<Header>(); 
 
 lazy_static::lazy_static! {
     static ref ALLOCATOR : Mutex<Allocator> = 
@@ -69,12 +70,13 @@ impl Allocator {
     }
 
     fn malloc(&mut self, size : usize) -> *mut u8 {
+        println!("alloc malloc");
         let m_size : usize = get_block_size(size); 
 
         let header_size = mem::size_of::<Header>(); 
         println!("header size {}", header_size);
-        println!("usize size {}", mem::size_of::<usize>());
-        println!("bool size {}", mem::size_of::<bool>());
+        // println!("usize size {}", mem::size_of::<usize>());
+        // println!("bool size {}", mem::size_of::<bool>());
 
         let mem : Vec<u8> = vec![0; m_size];
         let mut payload = mem.into_boxed_slice();
@@ -94,108 +96,47 @@ impl Allocator {
             };
 
         self.blocks.push(new_block);
+        println!("num blocks = {}", self.blocks.len());
         
         return payload_ptr;
     }
 
-    fn malloc_ll(&mut self, size : usize) -> *mut u8 {
-        // TODO: figure out block sizes
-        // 0.5KB, 1KB, 2KB, etc.. 
-        let m_size : usize = get_block_size(size); 
+    fn free(&mut self, ptr : *mut u8) { 
+        println!("alloc free");
 
-        let mem : Vec<u8> = vec![0; m_size];
-        let mut payload = mem.into_boxed_slice();
-        let payload_ptr = payload.as_mut_ptr();
-
-        // don't drop memory when var out of scope 
-        std::mem::forget(payload);
-
-        let new_block = 
-            Box::new(
-                Block {
-                    size : m_size, 
-                    request_size: size,
-                    used : true,
-                    payload : payload_ptr,
-                    next : self.head.take(),
-                });
-    
-        self.head = Some(new_block);
-        self.num_used += 1; 
-        return payload_ptr;
-    }
-
-    // Function does not release payload 
-    fn pop(&mut self) {
-        match self.head.take() {
-            None => {} // do nothing,
-            Some(node) => {
-                self.head = node.next;
+        let mut rm_idx : Option<usize> = None; 
+        for i in 0..self.blocks.len() {
+            self.blocks.get(i).map(|b| {
+                if b.payload == ptr {
+                    rm_idx = Some(i);
+                    println!("Found pointer match req size was = {}", b.request_size);
+                    unsafe {
+                        println!("Dropping ptr");
+                        Box::from_raw(ptr); 
+                    }
+                }
+            });
+        }
+     
+        match rm_idx {
+            None => println!("Invalid free call"), 
+            Some(i) => {
+                println!("Removing block at index {}", i);
+                let size_prev = self.blocks.len();
+                self.blocks.swap_remove(i);
+                assert_eq!(self.blocks.len(), size_prev - 1);
             }
         }
     }
+}
 
-    fn free(&mut self, ptr : *mut u8) {
-        println!("alloc free");
-
-        // let mut found_match = false; 
-
-        // find associated block 
-        let mut temp = &self.head;
-        // let mut temp = &mut self.head;
-        // let mut prev = &mut self.head; 
-        // let mut is_first = true;
-        while temp.is_some() {
-            let ref t = temp.as_ref().unwrap();
-            // println!("Prev req size was = {}", prev.as_ref().unwrap().request_size);
-            // println!("Temp req size was = {}", t.request_size);
-            if t.payload == ptr {
-                // found_match = true;
-                // drop payload
-                println!("Found pointer match req size was = {}", t.request_size);
-                unsafe {
-                    println!("Dropping ptr");
-                    Box::from_raw(ptr); 
-                }
-
-                // match temp {
-                //     None => panic!("temp is null"),
-                //     Some(ref mut temp) => 
-                //         // I think this is where you create a new block..
-                // };
-
-                // TODO: merge algo 
-
-                // uh doesn't work probably wont work --> drop block, relink
-                // if is_first { 
-                //     // first block 
-                //     self.pop(); 
-                // } else if t.next.is_none() { 
-                //     // last block 
-                //     prev.as_ref().unwrap().next = None;
-                // } else { // middle block
-                //     prev.as_ref().unwrap().next = t.next.take();
-                // }
-
-                break; 
-            } 
-            // prev = temp; 
-            temp = &t.next; 
-            // is_first = false;
-        }
-
-        // if !found_match {
-        //     println!("Invalid rgc_free");
-        // }
+impl Drop for Allocator {
+    fn drop(&mut self) {
+        println!("Allocator dropped");
+        self.blocks.clear();
     }
 }
 
-// fn inc() -> usize {
-//     let mut guard = ALLOCATOR.lock().unwrap();
-//     (*guard).num_used += 1;
-//     let copy = (*guard).num_used;
-//     return copy;
-// }
 
 pub fn malloc(size: usize) -> *mut u8 {
     if size == 0 {
@@ -214,9 +155,19 @@ pub fn free(ptr: *mut u8) {
     }
 }
 
+pub fn alloc_clean() {
+    // TODO: fix me, allocator doesn't clean up
+    println!("size of mutex allocator {}", std::mem::size_of::<Mutex<Allocator>>());
+    let guard = ALLOCATOR.lock().unwrap();
+    // drop(guard); 
+    std::mem::drop(guard);
+    // std::mem::drop(ALLOCATOR);
+}
+
 pub fn alloc_init() {
     // Assert for 64bit arch
     assert_eq!(usize::MAX, 18446744073709551615, "Expected arch 64");
     println!("Initializing  Allocator");
 }
+
 

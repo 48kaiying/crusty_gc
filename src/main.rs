@@ -15,8 +15,8 @@ fn main() {
 
     println!("Hello, world!");
 
-    allocator::alloc_init();
-    allocator::malloc(100); 
+    // allocator::alloc_init();
+    // allocator::malloc(100); 
     
     println!("Done!");
 }

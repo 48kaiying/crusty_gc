@@ -40,3 +40,9 @@ pub extern "C" fn rgc_free(ptr: *mut u8) {
     allocator::free(ptr);
 }
 
+#[no_mangle]
+pub extern "C" fn rgc_cleanup() {
+    allocator::alloc_clean();
+}
+
+

@@ -14,10 +14,10 @@ typedef struct Point
 int main()
 {
     printf("Sample C Application!\n");
-    rust_test();
-    int x = rust_test2(10);
-    printf("Expected 11 = %d\n", x);
-    rust_string("Hello there");
+    // rust_test();
+    // int x = rust_test2(10);
+    // printf("Expected 11 = %d\n", x);
+    // rust_string("Hello there");
 
     rgc_init();
 
@@ -79,6 +79,13 @@ int main()
     printf("#################### Test 4 ####################\n");
 
     // rgc_free((char *)int_arr);
+    // rgc_free((char *)p);
+    rgc_free((char *)cptr);
+    // rgc_free((char *)p);
+
+    // rgc_free((char *)(++int_arr));
+
+    rgc_cleanup();
 
     printf("End of c prog\n");
     return 0;
