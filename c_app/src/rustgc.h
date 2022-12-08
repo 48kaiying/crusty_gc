@@ -7,3 +7,4 @@ extern void rgc_init();
 extern void rgc_cleanup();
 extern char *rgc_malloc(unsigned long);
 extern void rgc_free(char *);
+extern void rgc_garbage_collect();

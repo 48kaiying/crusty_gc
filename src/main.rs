@@ -16,7 +16,8 @@ fn main() {
     println!("Hello, world!");
 
     // allocator::alloc_init();
-    // allocator::malloc(100); 
+    // allocator::malloc(100);
+    // create_heap_graph() 
     
     println!("Done!");
 }

@@ -34,7 +34,6 @@ pub extern "C" fn rgc_malloc(size: isize) -> *mut u8 {
     return allocator::malloc(size as usize);
 }
 
-
 #[no_mangle]
 pub extern "C" fn rgc_free(ptr: *mut u8) {
     allocator::free(ptr);
@@ -45,4 +44,8 @@ pub extern "C" fn rgc_cleanup() {
     allocator::alloc_clean();
 }
 
+#[no_mangle]
+pub extern "C" fn rgc_garbage_collect() {
+    allocator::garbage_collect();
+}
 
