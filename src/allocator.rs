@@ -27,6 +27,8 @@ struct Allocator {
     num_used: usize,
     num_free: usize,
     blocks: Vec<Block>,
+    // etext: *const u8,
+    // end: *const u8,
 }
 
 fn get_block_size(size: usize) -> usize {
@@ -51,11 +53,14 @@ fn get_block_size(size: usize) -> usize {
 }
 
 impl Allocator {
+    // pub fn new(etext: *const u8, end: *const u8) -> Allocator {
     pub fn new() -> Allocator {
         Allocator {
             num_used: 0,
             num_free: 0,
             blocks: Vec::new(),
+            // etext: 0 as *const u8,
+            // end: 0 as *const u8,
         }
     }
 
@@ -192,11 +197,24 @@ impl Allocator {
         }
     }
 
-    pub fn sweep_root_mem() {
-        // look through stack, bss, globals
+    // etext is the last address past the text segment
+    // end is the address of the start of the heap and last address pass the BSS
+    // These variables are provided via the linux linker
+    // TODO: move these variables to allocator initailizer since they don't change
+    pub fn sweep_root_mem(&self, etext: *const u8, end: *const u8) {
+        println!(
+            "Sweep Initialized Data & BSS Regions from {:p} to {:p}",
+            etext, end
+        );
+        // Scan through global memory region (initialized and uninitialized - BSS)
+        // Scan etext (low address) --> end (high address)
+
+        // Scan through stack which grows high to low
+        // Start from stack bottom (high address) --> end / stack top (low address)
     }
 
-    pub fn find_garbage() {
+    pub fn find_mem_leaks() {
+        // find garbage = leaked objects
         // dfs on hg
     }
 }
@@ -225,10 +243,11 @@ pub fn free(ptr: *mut u8) {
     }
 }
 
-pub fn garbage_collect() {
+pub fn garbage_collect(etext: *const u8, end: *const u8) {
     let mut guard = ALLOCATOR.lock().unwrap();
     println!("Garbage collecting");
     guard.create_heap_graph();
+    guard.sweep_root_mem(etext, end);
 }
 
 pub fn alloc_clean() {

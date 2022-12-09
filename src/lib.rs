@@ -1,4 +1,4 @@
-use std::ffi::{CStr};
+use std::ffi::CStr;
 mod allocator;
 
 #[no_mangle]
@@ -9,7 +9,7 @@ pub extern "C" fn rust_test() {
 #[no_mangle]
 pub extern "C" fn rust_test2(a: i32) -> i32 {
     println!("C app passed value {}", a);
-    return a + 1; 
+    return a + 1;
 }
 
 #[no_mangle]
@@ -26,7 +26,7 @@ pub extern "C" fn rgc_init() {
 #[no_mangle]
 pub extern "C" fn rgc_malloc(size: isize) -> *mut u8 {
     if size <= 0 {
-        return 0 as *mut u8; 
+        return 0 as *mut u8;
     }
 
     println!("rgc malloc requested {}", size);
@@ -45,7 +45,6 @@ pub extern "C" fn rgc_cleanup() {
 }
 
 #[no_mangle]
-pub extern "C" fn rgc_garbage_collect() {
-    allocator::garbage_collect();
+pub extern "C" fn rgc_garbage_collect(etext: *const u8, end: *const u8) {
+    allocator::garbage_collect(etext, end);
 }
-

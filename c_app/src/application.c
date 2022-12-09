@@ -3,6 +3,15 @@
 #include <string.h>
 #include "rustgc.h"
 
+// This is the first address past the end of the text segment (the program code).
+extern etext;
+
+// This is the first address past the end of the initialized data segment.
+extern edata;
+
+// This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
+extern end;
+
 typedef struct Stack_elt
 {
     int value;
@@ -58,7 +67,7 @@ void test_heap_graph_stack()
     stack_add(s, 3);
     stack_iterate(s);
     printf("Stack object in C:  %p\n", s);
-    rgc_garbage_collect();
+    rgc_garbage_collect(etext, end);
 }
 
 typedef struct Point
