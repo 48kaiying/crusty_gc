@@ -4,13 +4,13 @@
 #include "rustgc.h"
 
 // This is the first address past the end of the text segment (the program code).
-extern etext;
+extern char etext;
 
 // This is the first address past the end of the initialized data segment.
-extern edata;
+extern char edata;
 
 // This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
-extern end;
+extern char end;
 
 typedef struct Stack_elt
 {
@@ -67,7 +67,7 @@ void test_heap_graph_stack()
     stack_add(s, 3);
     stack_iterate(s);
     printf("Stack object in C:  %p\n", s);
-    rgc_garbage_collect(etext, end);
+    rgc_garbage_collect(&etext, &end);
 }
 
 typedef struct Point
@@ -87,10 +87,12 @@ typedef struct Point_container
     struct Point *fifth;
 } Point_container;
 
-void test_heap_graph()
+void fill_point_container(Point_container *pc)
 {
-    printf("Test heap graph point container\n");
-    Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
+    if (pc == NULL)
+    {
+        return;
+    }
 
     Point *first = (Point *)rgc_malloc(sizeof(Point));
     first->a = 1;
@@ -131,17 +133,62 @@ void test_heap_graph()
     strcpy(fifth->name, (char *)&name4);
     fifth->t = true;
     pc->fifth = fifth;
-    rgc_garbage_collect();
+}
 
-    // expected output
-    printf("Expected output from c:\n");
-    printf("Heap Object %p contains 5 references: %p, %p, %p, %p, %p\n",
+void print_point_container(Point_container *pc)
+{
+    printf("Object point container %p contains 5 references: %p, %p, %p, %p, %p\n",
            pc,
            pc->first,
            pc->sec,
            pc->third,
            pc->fourth,
            pc->fifth);
+}
+
+void test_heap_graph()
+{
+    printf("Test heap graph point container\n");
+    Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
+    fill_point_container(pc);
+    rgc_garbage_collect(&etext, &end);
+
+    // expected output
+    printf("Expected output from c:\n");
+    print_point_container(pc);
+}
+
+struct Point_container gpc_1 = {
+    .first = NULL,
+    .sec = NULL,
+    .third = NULL,
+    .fourth = NULL,
+    .fifth = NULL,
+};
+
+struct Point_container gpc_2 = {
+    .first = NULL,
+    .sec = NULL,
+    .third = NULL,
+    .fourth = NULL,
+    .fifth = NULL,
+};
+
+void test_scan_data_region()
+{
+    printf("Test scan data region\n");
+    fill_point_container(&gpc_1);
+    printf("Global gpc_1:\n");
+    print_point_container(&gpc_1);
+    rgc_garbage_collect(&etext, &end);
+}
+
+void print_root_mem_regions()
+{
+    printf("First address past:\n");
+    printf("    program text (etext)      %10p\n", &etext);
+    printf("    initialized data (edata)  %10p\n", &edata);
+    printf("    uninitialized data (end)  %10p\n", &end);
 }
 
 int main()
@@ -153,6 +200,7 @@ int main()
     // rust_string("Hello there");
 
     rgc_init();
+    print_root_mem_regions();
 
     // // Test Malloc
     // printf("#################### Test 1 ####################\n");
@@ -218,8 +266,11 @@ int main()
     // rgc_free((char *)(++int_arr));
 
     // Test points to something else
-    printf("#################### Test 5 ####################\n");
-    test_heap_graph();
+    // printf("#################### Test 5 ####################\n");
+    // test_heap_graph();
+
+    printf("#################### Test 6 ####################\n");
+    test_scan_data_region();
 
     printf("Cleaning RGC\n");
     // Clean up

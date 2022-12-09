@@ -116,9 +116,26 @@ impl Allocator {
         }
     }
 
+    // todo: remove self
+    pub fn print_heap_graph(&self, hg: &HashMap<*mut u8, HashSet<*mut u8>>) {
+        // Iterate over hg
+        println!("Printing heap graph");
+        for (obj, references) in hg {
+            print!(
+                "Heap Object {:p} contains {} references: ",
+                *obj,
+                references.len()
+            );
+            for r in references {
+                print!("{:p}, ", *r);
+            }
+            print!("\n");
+        }
+    }
+
     // Create new graph every sweep
     // TODO: optimize, only update graph with changes and don't make new
-    pub fn create_heap_graph(&self) {
+    pub fn create_heap_graph(&self, etext: *const u8, end: *const u8) {
         // Iterate through the blocks and find pointers from heap to heap
         // Key is allocation pointer
         // Value is if the alloc contains pointers in it
@@ -129,7 +146,7 @@ impl Allocator {
         // Sweep for objects
         for i in 0..self.blocks.len() {
             self.blocks.get(i).map(|b| {
-                println!("Inserting key in hg {:p}", b.payload);
+                // println!("Inserting key in hg {:p}", b.payload);
                 hg.insert(b.payload, HashSet::new());
                 objs.insert(b.payload, b.size);
             });
@@ -139,33 +156,26 @@ impl Allocator {
         let step = mem::size_of::<usize>() as usize;
         for i in 0..self.blocks.len() {
             self.blocks.get(i).map(|b| {
-                println!("Sweeping new heap object {:p}", b.payload);
+                // println!("Sweeping new heap object {:p}", b.payload);
                 // j is a potential pointer to another heap ref if there's a match
                 let mut offset: usize = 0;
                 while offset < b.size {
-                    // unsafe {
-                    //     println!(
-                    //         "potential pointer 0x{:02x}",
-                    //         *(b.payload.offset(offset as isize) as *const usize)
-                    //     );
-                    // }
                     for (obj_ptr, obj_size) in &objs {
-                        println!("Checking to see if there are references to {:p}", *obj_ptr);
+                        // println!("Checking to see if there are references to {:p}", *obj_ptr);
                         if *obj_ptr == b.payload {
                             // don't check for self
-                            println!("Skip self reference");
+                            // println!("Skip self reference");
                             continue;
                         }
                         unsafe {
-                            // let pref = *obj_ptr.offset(offset as isize);
                             let pref = *(b.payload.offset(offset as isize) as *const usize);
-                            println!("Potential pointer 0x{:02x}", pref);
+                            // println!("Potential pointer 0x{:02x}", pref);
 
                             if (pref as usize) >= (*obj_ptr as usize)
                                 && (pref as usize) < (*obj_ptr as usize) + obj_size
                             {
                                 // b.payload contains reference to this block
-                                println!("Found ref!");
+                                // println!("Found ref!");
                                 hg.entry(b.payload)
                                     .and_modify(|edges: &mut HashSet<*mut u8>| {
                                         edges.insert(*obj_ptr);
@@ -184,24 +194,21 @@ impl Allocator {
         }
 
         // Iterate over hg
-        for (obj, references) in &hg {
-            print!(
-                "Heap Object {:p} contains {} references: ",
-                *obj,
-                references.len()
-            );
-            for r in references {
-                print!("{:p}, ", *r);
-            }
-            print!("\n");
-        }
+        self.print_heap_graph(&hg);
+        self.sweep_root_mem(etext, end, &mut hg, &objs);
     }
 
     // etext is the last address past the text segment
     // end is the address of the start of the heap and last address pass the BSS
     // These variables are provided via the linux linker
     // TODO: move these variables to allocator initailizer since they don't change
-    pub fn sweep_root_mem(&self, etext: *const u8, end: *const u8) {
+    pub fn sweep_root_mem(
+        &self,
+        etext: *const u8,
+        end: *const u8,
+        hg: &mut HashMap<*mut u8, HashSet<*mut u8>>,
+        objs: &HashMap<*mut u8, usize>,
+    ) {
         println!(
             "Sweep Initialized Data & BSS Regions from {:p} to {:p}",
             etext, end
@@ -209,8 +216,47 @@ impl Allocator {
         // Scan through global memory region (initialized and uninitialized - BSS)
         // Scan etext (low address) --> end (high address)
 
+        let step = mem::size_of::<usize>() as usize;
+        let mut offset: usize = 0;
+        let data_range = end as usize - etext as usize;
+        while offset < data_range {
+            for (obj_ptr, obj_size) in objs {
+                unsafe {
+                    println!(
+                        "Checking value at address {:p} for heap ref",
+                        etext.offset(offset as isize)
+                    );
+                    continue;
+                }
+
+                // println!("Checking to see if there are references to {:p}", *obj_ptr);
+                unsafe {
+                    let pref = *(etext.offset(offset as isize) as *const usize);
+                    if pref == 0 {
+                        continue;
+                    }
+                    // println!("Potential pointer 0x{:02x}", pref);
+
+                    if (pref as usize) >= (*obj_ptr as usize)
+                        && (pref as usize) < (*obj_ptr as usize) + obj_size
+                    {
+                        // b.payload contains reference to this block
+                        println!("Found ref!");
+                        hg.entry(pref as *mut u8)
+                            .and_modify(|edges: &mut HashSet<*mut u8>| {
+                                edges.insert(*obj_ptr);
+                            });
+                    }
+                }
+            }
+            offset += step;
+        }
+
         // Scan through stack which grows high to low
         // Start from stack bottom (high address) --> end / stack top (low address)
+
+        println!("Heap graph after sweeping root memory");
+        self.print_heap_graph(&hg);
     }
 
     pub fn find_mem_leaks() {
@@ -244,10 +290,10 @@ pub fn free(ptr: *mut u8) {
 }
 
 pub fn garbage_collect(etext: *const u8, end: *const u8) {
-    let mut guard = ALLOCATOR.lock().unwrap();
+    let guard = ALLOCATOR.lock().unwrap();
     println!("Garbage collecting");
-    guard.create_heap_graph();
-    guard.sweep_root_mem(etext, end);
+    guard.create_heap_graph(etext, end);
+    // guard.sweep_root_mem(etext, end);
 }
 
 pub fn alloc_clean() {
