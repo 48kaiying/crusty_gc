@@ -132,12 +132,27 @@ impl Allocator {
     }
 
     // todo: remove self
-    pub fn print_heap_graph(&self, hg: &HashMap<*mut u8, HashSet<*mut u8>>) {
-        // Iterate over hg
-        println!("Printing heap graph");
+    pub fn print_heap_graph(&self, hg: &HashMap<*mut u8, HashSet<*mut u8>>, msg: &'static str) {
+        println!("Printing heap graph {}", msg);
+
+        // Get list of pure heap objects
+        let mut heap_objs = HashSet::new();
+        for i in 0..self.blocks.len() {
+            self.blocks.get(i).map(|b| {
+                // println!("Inserting key in hg {:p}", b.payload);
+                heap_objs.insert(b.payload);
+            });
+        }
+
+        // Iterate over heap graph
         for (obj, references) in hg {
             print!(
-                "Heap Object {:p} contains {} references: ",
+                "{} {:p} contains {} heap reference(s): ",
+                if heap_objs.contains(obj) {
+                    "H" // heap pointer
+                } else {
+                    "R" // root pointer
+                },
                 *obj,
                 references.len()
             );
@@ -209,7 +224,7 @@ impl Allocator {
         }
 
         // Iterate over hg
-        self.print_heap_graph(&hg);
+        self.print_heap_graph(&hg, "with only heap to heap references");
         self.sweep_root_mem(etext, end, &mut hg, &objs);
     }
 
@@ -238,7 +253,8 @@ impl Allocator {
         // Warn if end is not eight byte aligned
         if end_aligned != end as usize {
             println!(
-                "Warning: end address is not 8-byte aligned was {:p} but evaluating as {:p}",
+                "Warning: end address is not 8-byte aligned was 
+                {:p} but evaluating as {:p}",
                 end, end_aligned as *const usize
             );
         }
@@ -247,37 +263,38 @@ impl Allocator {
         let mut offset: usize = 0;
         let data_range = end_aligned - etext_aligned;
         println!("range is {}", data_range);
+        let start = etext_aligned as *const u8;
         while offset < data_range {
-            unsafe {
-                println!(
-                    "Checking value at address {:p} for heap ref",
-                    (etext_aligned as *const u8).offset(offset as isize)
-                );
-            }
-
-            // for (obj_ptr, obj_size) in objs {
-
-            //     // println!("Checking to see if there are references to {:p}", *obj_ptr);
-            //     unsafe {
-            //         let pref = *(etext.offset(offset as isize) as *const usize);
-            //         if pref == 0 {
-            //             continue;
-            //         }
-            //         // println!("Potential pointer 0x{:02x}", pref);
-
-            //         if (pref as usize) >= (*obj_ptr as usize)
-            //             && (pref as usize) < (*obj_ptr as usize) + obj_size
-            //         {
-            //             // Found root memory reference to this block
-            //             println!("Found ref!");
-            //             hg.entry(pref as *mut u8)
-            //                 .and_modify(|edges: &mut HashSet<*mut u8>| {
-            //                     edges.insert(*obj_ptr);
-            //                 });
-            //             //
-            //         }
-            //     }
+            // unsafe {
+            //     println!(
+            //         "Checking value at address {:p} for heap ref",
+            //         start.offset(offset as isize)
+            //     );
             // }
+
+            for (obj_ptr, obj_size) in objs {
+                // println!("Checking to see if there are references to {:p}", *obj_ptr);
+                unsafe {
+                    let root_address = start.offset(offset as isize) as *const usize;
+                    let pref = *root_address;
+                    if pref == 0 {
+                        continue;
+                    }
+                    // println!("Potential pointer 0x{:02x}", pref);
+
+                    if (pref as usize) >= (*obj_ptr as usize)
+                        && (pref as usize) < (*obj_ptr as usize) + obj_size
+                    {
+                        // Found root memory reference to this block
+                        // println!("Found ref in root!");
+                        hg.entry(root_address as *mut u8)
+                            .and_modify(|edges: &mut HashSet<*mut u8>| {
+                                edges.insert(*obj_ptr);
+                            })
+                            .or_insert(HashSet::from([*obj_ptr]));
+                    }
+                }
+            }
             offset += step;
         }
 
@@ -285,7 +302,7 @@ impl Allocator {
         // Start from stack bottom (high address) --> end / stack top (low address)
 
         println!("Heap graph after sweeping root memory");
-        self.print_heap_graph(&hg);
+        self.print_heap_graph(&hg, "contains root to heap references");
     }
 
     pub fn find_mem_leaks() {
