@@ -57,7 +57,7 @@ void stack_iterate(const Stack *s)
     printf("Stack Bottom\n");
 }
 
-void test_heap_graph_stack()
+void unused_test_heap_graph_stack()
 {
     printf("Test heap graph stack\n");
     Stack *s = (Stack *)rgc_malloc(sizeof(Stack));
@@ -178,9 +178,10 @@ void test_scan_data_region()
 {
     printf("Test scan data region\n");
     fill_point_container(&gpc_1);
+    rgc_garbage_collect(&etext, &end);
+    printf("Expected output is a new heap object %p with 5 references:\n", &gpc_1);
     printf("Global gpc_1:\n");
     print_point_container(&gpc_1);
-    rgc_garbage_collect(&etext, &end);
 }
 
 void print_root_mem_regions()
@@ -190,6 +191,8 @@ void print_root_mem_regions()
     printf("    initialized data (edata)  %10p\n", &edata);
     printf("    uninitialized data (end)  %10p\n", &end);
 }
+
+// #def NOT_TESTING
 
 int main()
 {
@@ -202,68 +205,70 @@ int main()
     rgc_init();
     print_root_mem_regions();
 
-    // // Test Malloc
-    // printf("#################### Test 1 ####################\n");
-    // char *cptr;
-    // char test[] = {'d', 'u', 'c', 'k', 'y', '\0'};
-    // printf("Size of test = %lu\n", sizeof(test));
+#ifdef NOT_TESTING
+    // Test Malloc
+    printf("#################### Test 1 ####################\n");
+    char *cptr;
+    char test[] = {'d', 'u', 'c', 'k', 'y', '\0'};
+    printf("Size of test = %lu\n", sizeof(test));
 
-    // cptr = rgc_malloc(sizeof(test));
+    cptr = rgc_malloc(sizeof(test));
 
-    // printf("Value:  %p\n", cptr);
+    printf("Value:  %p\n", cptr);
 
-    // char *temp = cptr;
-    // for (int i = 0; i < 8; ++i)
-    // {
-    //     *temp = test[i];
-    //     temp++;
-    // }
+    char *temp = cptr;
+    for (int i = 0; i < 8; ++i)
+    {
+        *temp = test[i];
+        temp++;
+    }
 
-    // printf("cptr = %s\n", cptr);
+    printf("cptr = %s\n", cptr);
 
-    // printf("#################### Test 2 ####################\n");
-    // int count = 400;
-    // int *int_arr = (int *)(rgc_malloc(sizeof(int) * count));
+    printf("#################### Test 2 ####################\n");
+    int count = 400;
+    int *int_arr = (int *)(rgc_malloc(sizeof(int) * count));
 
-    // if (int_arr)
-    // {
-    //     printf("Prt not null - populating\n");
-    //     int *temp = int_arr;
-    //     for (int i = 0; i < count; ++i)
-    //     {
-    //         *temp = i;
-    //         temp++;
-    //     }
+    if (int_arr)
+    {
+        printf("Prt not null - populating\n");
+        int *temp = int_arr;
+        for (int i = 0; i < count; ++i)
+        {
+            *temp = i;
+            temp++;
+        }
 
-    //     printf("Print results\n");
-    //     for (int i = 0; i < count; ++i)
-    //     {
-    //         printf("%d\n", int_arr[i]);
-    //     }
-    // }
+        printf("Print results\n");
+        for (int i = 0; i < count; ++i)
+        {
+            printf("%d\n", int_arr[i]);
+        }
+    }
 
-    // printf("#################### Test 3 ####################\n");
-    // Point *p = (Point *)(rgc_malloc(sizeof(Point)));
-    // p->a = 5;
-    // p->b = 10;
-    // const char name[] = "JFK";
-    // strcpy(p->name, (char *)&name);
-    // p->t = true;
+    printf("#################### Test 3 ####################\n");
+    Point *p = (Point *)(rgc_malloc(sizeof(Point)));
+    p->a = 5;
+    p->b = 10;
+    const char name[] = "JFK";
+    strcpy(p->name, (char *)&name);
+    p->t = true;
 
-    // Point *p2 = p;
-    // printf("Point.a = %d\n", p2->a);
-    // printf("Point.b = %d\n", p2->b);
-    // printf("Point.name = %s\n", p2->name);
-    // printf("Point.t = %s\n", p2->t ? "true" : "false");
+    Point *p2 = p;
+    printf("Point.a = %d\n", p2->a);
+    printf("Point.b = %d\n", p2->b);
+    printf("Point.name = %s\n", p2->name);
+    printf("Point.t = %s\n", p2->t ? "true" : "false");
 
-    // // Test Free
-    // printf("#################### Test 4 ####################\n");
+    // Test Free
+    printf("#################### Test 4 ####################\n");
 
-    // rgc_free((char *)int_arr);
-    // rgc_free((char *)p);
-    // rgc_free((char *)cptr);
+    rgc_free((char *)int_arr);
+    rgc_free((char *)p);
+    rgc_free((char *)cptr);
 
-    // rgc_free((char *)(++int_arr));
+    rgc_free((char *)(++int_arr));
+#endif
 
     // Test points to something else
     // printf("#################### Test 5 ####################\n");

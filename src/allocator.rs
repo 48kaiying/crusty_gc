@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::error;
 use std::mem;
 use std::sync::Mutex;
 
@@ -50,6 +51,20 @@ fn get_block_size(size: usize) -> usize {
     }
 
     unimplemented!("Requested size is too large");
+}
+
+// Makes sure an address is 8-byte aligned
+// Will round up unless round_down is true
+pub fn align_as_eight(addr: usize, round_down: bool) -> usize {
+    if addr % 8 != 0 {
+        if round_down {
+            return addr - (8 - addr % 8);
+        } else {
+            return addr + (8 - addr % 8);
+        }
+    } else {
+        return addr;
+    }
 }
 
 impl Allocator {
@@ -210,45 +225,59 @@ impl Allocator {
         objs: &HashMap<*mut u8, usize>,
     ) {
         println!(
-            "Sweep Initialized Data & BSS Regions from {:p} to {:p}",
+            "Sweep Initialized Data & BSS Regions from etext {:p} to end {:p}",
             etext, end
         );
         // Scan through global memory region (initialized and uninitialized - BSS)
         // Scan etext (low address) --> end (high address)
 
+        // Make sure start and end addresses are 8-byte aligned
+        let etext_aligned = align_as_eight(etext as usize, false);
+        let end_aligned = align_as_eight(end as usize, true);
+
+        // Warn if end is not eight byte aligned
+        if end_aligned != end as usize {
+            println!(
+                "Warning: end address is not 8-byte aligned was {:p} but evaluating as {:p}",
+                end, end_aligned as *const usize
+            );
+        }
         let step = mem::size_of::<usize>() as usize;
+        println!("step size {}", step);
         let mut offset: usize = 0;
-        let data_range = end as usize - etext as usize;
+        let data_range = end_aligned - etext_aligned;
+        println!("range is {}", data_range);
         while offset < data_range {
-            for (obj_ptr, obj_size) in objs {
-                unsafe {
-                    println!(
-                        "Checking value at address {:p} for heap ref",
-                        etext.offset(offset as isize)
-                    );
-                    continue;
-                }
-
-                // println!("Checking to see if there are references to {:p}", *obj_ptr);
-                unsafe {
-                    let pref = *(etext.offset(offset as isize) as *const usize);
-                    if pref == 0 {
-                        continue;
-                    }
-                    // println!("Potential pointer 0x{:02x}", pref);
-
-                    if (pref as usize) >= (*obj_ptr as usize)
-                        && (pref as usize) < (*obj_ptr as usize) + obj_size
-                    {
-                        // b.payload contains reference to this block
-                        println!("Found ref!");
-                        hg.entry(pref as *mut u8)
-                            .and_modify(|edges: &mut HashSet<*mut u8>| {
-                                edges.insert(*obj_ptr);
-                            });
-                    }
-                }
+            unsafe {
+                println!(
+                    "Checking value at address {:p} for heap ref",
+                    (etext_aligned as *const u8).offset(offset as isize)
+                );
             }
+
+            // for (obj_ptr, obj_size) in objs {
+
+            //     // println!("Checking to see if there are references to {:p}", *obj_ptr);
+            //     unsafe {
+            //         let pref = *(etext.offset(offset as isize) as *const usize);
+            //         if pref == 0 {
+            //             continue;
+            //         }
+            //         // println!("Potential pointer 0x{:02x}", pref);
+
+            //         if (pref as usize) >= (*obj_ptr as usize)
+            //             && (pref as usize) < (*obj_ptr as usize) + obj_size
+            //         {
+            //             // Found root memory reference to this block
+            //             println!("Found ref!");
+            //             hg.entry(pref as *mut u8)
+            //                 .and_modify(|edges: &mut HashSet<*mut u8>| {
+            //                     edges.insert(*obj_ptr);
+            //                 });
+            //             //
+            //         }
+            //     }
+            // }
             offset += step;
         }
 
