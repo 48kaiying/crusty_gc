@@ -178,10 +178,13 @@ void test_scan_data_region()
 {
     printf("Test scan data region\n");
     fill_point_container(&gpc_1);
+    fill_point_container(&gpc_2);
     rgc_garbage_collect(&etext, &end);
     printf("Expected output is a new heap object %p with 5 references:\n", &gpc_1);
     printf("Global gpc_1:\n");
     print_point_container(&gpc_1);
+    printf("Global gpc_2:\n");
+    print_point_container(&gpc_2);
 }
 
 void print_root_mem_regions()
