@@ -187,6 +187,34 @@ void test_scan_data_region()
     print_point_container(&gpc_2);
 }
 
+Point_container *gpc_arr[3] = {
+    NULL,
+    NULL,
+    NULL,
+};
+
+void test_heap_and_global()
+{
+    printf("Test heap and global ref\n");
+
+    for (int i = 0; i < 3; ++i)
+    {
+        Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
+        fill_point_container(pc);
+        gpc_arr[i] = pc;
+    }
+
+    rgc_garbage_collect(&etext, &end);
+
+    // expected output
+    printf("Expected output from c:\n");
+    for (int i = 0; i < 3; ++i)
+    {
+        printf("gpc_arr[%d] = ", i);
+        print_point_container(gpc_arr[i]);
+    }
+}
+
 void print_root_mem_regions()
 {
     printf("First address past:\n");
@@ -271,14 +299,19 @@ int main()
     rgc_free((char *)cptr);
 
     rgc_free((char *)(++int_arr));
-#endif
 
-    // Test points to something else
-    // printf("#################### Test 5 ####################\n");
-    // test_heap_graph();
+    // Test can find heap to heap references
+    printf("#################### Test 5 ####################\n");
+    test_heap_graph();
 
+    // Test can find global to heap references
     printf("#################### Test 6 ####################\n");
     test_scan_data_region();
+#endif
+
+    // Test can find global ref to a heap object with heap refs
+    printf("#################### Test 7 ####################\n");
+    test_heap_and_global();
 
     printf("Cleaning RGC\n");
     // Clean up
