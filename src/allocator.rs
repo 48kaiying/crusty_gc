@@ -165,7 +165,13 @@ impl Allocator {
 
     // Create new graph every sweep
     // TODO: optimize, only update graph with changes and don't make new
-    pub fn create_heap_graph(&self, etext: *const u8, end: *const u8) {
+    pub fn create_heap_graph(
+        &self,
+        etext: *const u8,
+        end: *const u8,
+        stack_top: *const u8,
+        stack_bottom: *const u8,
+    ) {
         // Iterate through the blocks and find pointers from heap to heap
         // Key is allocation pointer
         // Value is if the alloc contains pointers in it
@@ -225,7 +231,7 @@ impl Allocator {
 
         // Iterate over hg
         self.print_heap_graph(&hg, "with only heap to heap references");
-        self.sweep_root_mem(etext, end, &mut hg, &objs);
+        self.sweep_root_mem(etext, end, stack_top, stack_bottom, &mut hg, &objs);
     }
 
     // etext is the last address past the text segment
@@ -236,6 +242,8 @@ impl Allocator {
         &self,
         etext: *const u8,
         end: *const u8,
+        stack_top: *const u8,
+        stack_bottom: *const u8,
         hg: &mut HashMap<*mut u8, HashSet<*mut u8>>,
         objs: &HashMap<*mut u8, usize>,
     ) {
@@ -299,7 +307,11 @@ impl Allocator {
         }
 
         // Scan through stack which grows high to low
-        // Start from stack bottom (high address) --> end / stack top (low address)
+        // Start from stack bottom (high address) --> stack top (low address)
+        println!(
+            "Sweep stack from bottom (high) {:p} to top (low) {:p}",
+            stack_bottom, stack_top
+        );
 
         println!("Heap graph after sweeping root memory");
         self.print_heap_graph(&hg, "contains root to heap references");
@@ -335,10 +347,15 @@ pub fn free(ptr: *mut u8) {
     }
 }
 
-pub fn garbage_collect(etext: *const u8, end: *const u8) {
+pub fn garbage_collect(
+    etext: *const u8,
+    end: *const u8,
+    stack_top: *const u8,
+    stack_bottom: *const u8,
+) {
     let guard = ALLOCATOR.lock().unwrap();
     println!("Garbage collecting");
-    guard.create_heap_graph(etext, end);
+    guard.create_heap_graph(etext, end, stack_top, stack_bottom);
     // guard.sweep_root_mem(etext, end);
 }
 

@@ -3,15 +3,6 @@
 #include <string.h>
 #include "rustgc.h"
 
-// This is the first address past the end of the text segment (the program code).
-extern char etext;
-
-// This is the first address past the end of the initialized data segment.
-extern char edata;
-
-// This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
-extern char end;
-
 typedef struct Stack_elt
 {
     int value;
@@ -67,7 +58,7 @@ void unused_test_heap_graph_stack()
     stack_add(s, 3);
     stack_iterate(s);
     printf("Stack object in C:  %p\n", s);
-    rgc_garbage_collect(&etext, &end);
+    rgc_garbage_collect_nice();
 }
 
 typedef struct Point
@@ -151,7 +142,7 @@ void test_heap_graph()
     printf("Test heap graph point container\n");
     Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
     fill_point_container(pc);
-    rgc_garbage_collect(&etext, &end);
+    rgc_garbage_collect_nice();
 
     // expected output
     printf("Expected output from c:\n");
@@ -179,7 +170,8 @@ void test_scan_data_region()
     printf("Test scan data region\n");
     fill_point_container(&gpc_1);
     fill_point_container(&gpc_2);
-    rgc_garbage_collect(&etext, &end);
+    rgc_garbage_collect_nice();
+
     printf("Expected output is a new heap object %p with 5 references:\n", &gpc_1);
     printf("Global gpc_1:\n");
     print_point_container(&gpc_1);
@@ -204,7 +196,7 @@ void test_heap_and_global()
         gpc_arr[i] = pc;
     }
 
-    rgc_garbage_collect(&etext, &end);
+    rgc_garbage_collect_nice();
 
     // expected output
     printf("Expected output from c:\n");

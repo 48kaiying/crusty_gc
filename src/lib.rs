@@ -45,6 +45,11 @@ pub extern "C" fn rgc_cleanup() {
 }
 
 #[no_mangle]
-pub extern "C" fn rgc_garbage_collect(etext: *const u8, end: *const u8) {
-    allocator::garbage_collect(etext, end);
+pub extern "C" fn rgc_garbage_collect(
+    etext: *const u8,
+    end: *const u8,
+    stack_top: *const u8,
+    stack_bottom: *const u8,
+) {
+    allocator::garbage_collect(etext, end, stack_top, stack_bottom);
 }
