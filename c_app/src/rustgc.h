@@ -20,15 +20,15 @@ extern char edata;
 // This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
 extern char end;
 
-static __always_inline void rgc_stack_top(long unsigned int *stack_top)
+static __always_inline void rgc_stack_top(long unsigned *stack_top)
 {
     // Get the top of the stack by moving the ebp register value to sp
-    // %%ebp contains stack frame pointer (we do not use %%esp)
-    __asm__ volatile("movl %%ebp, %0"
-                     : "=r"(stack_top));
+    // %%ebp contains stack frame pointer (we do not use %esp)
+    __asm__ volatile("movl %ebp, %0"
+                     : "=r"((unsigned int *)stack_top));
 }
 
-static __always_inline void rgc_stack_bottom(long unsigned int *stack_bottom)
+static __always_inline void rgc_stack_bottom(long unsigned *stack_bottom)
 {
     // Stack pointer is the 28th value in linux /proc/self/stat
     // See /proc/[pid]/stat section in https://man7.org/linux/man-pages/man5/proc.5.html
@@ -53,8 +53,8 @@ static __always_inline void rgc_stack_bottom(long unsigned int *stack_bottom)
 
 static void __inline__ rgc_garbage_collect_nice()
 {
-    long unsigned int stack_top;
-    long unsigned int stack_bottom;
+    long unsigned stack_top;
+    long unsigned stack_bottom;
     rgc_stack_top(&stack_top);
     rgc_stack_bottom(&stack_bottom);
     rgc_garbage_collect(&etext, &end, (char *)&stack_top, (char *)&stack_bottom);

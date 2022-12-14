@@ -234,45 +234,23 @@ impl Allocator {
         self.sweep_root_mem(etext, end, stack_top, stack_bottom, &mut hg, &objs);
     }
 
-    // etext is the last address past the text segment
-    // end is the address of the start of the heap and last address pass the BSS
-    // These variables are provided via the linux linker
-    // TODO: move these variables to allocator initailizer since they don't change
-    pub fn sweep_root_mem(
+    pub fn scan_region(
         &self,
-        etext: *const u8,
+        start: *const u8,
         end: *const u8,
-        stack_top: *const u8,
-        stack_bottom: *const u8,
+        step: usize,
         hg: &mut HashMap<*mut u8, HashSet<*mut u8>>,
         objs: &HashMap<*mut u8, usize>,
     ) {
-        println!(
-            "Sweep Initialized Data & BSS Regions from etext {:p} to end {:p}",
-            etext, end
-        );
-        // Scan through global memory region (initialized and uninitialized - BSS)
-        // Scan etext (low address) --> end (high address)
-
-        // Make sure start and end addresses are 8-byte aligned
-        let etext_aligned = align_as_eight(etext as usize, false);
-        let end_aligned = align_as_eight(end as usize, true);
-
-        // Warn if end is not eight byte aligned
-        if end_aligned != end as usize {
-            println!(
-                "Warning: end address is not 8-byte aligned was 
-                {:p} but evaluating as {:p}",
-                end, end_aligned as *const usize
-            );
-        }
-        let step = mem::size_of::<usize>() as usize;
-        println!("step size {}", step);
+        let scan_range = end as usize - start as usize;
         let mut offset: usize = 0;
-        let data_range = end_aligned - etext_aligned;
-        println!("range is {}", data_range);
-        let start = etext_aligned as *const u8;
-        while offset < data_range {
+
+        println!(
+            "Scan region from {:p} to {:p} (range {}) with step {}-bytes",
+            start, end, scan_range, step
+        );
+
+        while offset < scan_range {
             // unsafe {
             //     println!(
             //         "Checking value at address {:p} for heap ref",
@@ -305,6 +283,49 @@ impl Allocator {
             }
             offset += step;
         }
+    }
+
+    // etext is the last address past the text segment
+    // end is the address of the start of the heap and last address pass the BSS
+    // These variables are provided via the linux linker
+    // TODO: move these variables to allocator initailizer since they don't change
+    pub fn sweep_root_mem(
+        &self,
+        etext: *const u8,
+        end: *const u8,
+        stack_top: *const u8,
+        stack_bottom: *const u8,
+        hg: &mut HashMap<*mut u8, HashSet<*mut u8>>,
+        objs: &HashMap<*mut u8, usize>,
+    ) {
+        println!(
+            "Sweep Initialized Data & BSS Regions from etext {:p} to end {:p}",
+            etext, end
+        );
+        // Scan through global memory region (initialized and uninitialized - BSS)
+        // Scan etext (low address) --> end (high address)
+
+        // Make sure start and end addresses are 8-byte aligned
+        let etext_aligned = align_as_eight(etext as usize, false);
+        let end_aligned = align_as_eight(end as usize, true);
+
+        // Warn if end is not eight byte aligned
+        if end_aligned != end as usize {
+            println!(
+                "Warning: end address is not 8-byte aligned was 
+                {:p} but evaluating as {:p}",
+                end, end_aligned as *const usize
+            );
+        }
+
+        let step = mem::size_of::<usize>() as usize;
+        self.scan_region(
+            etext_aligned as *const u8,
+            end_aligned as *const u8,
+            step,
+            hg,
+            objs,
+        );
 
         // Scan through stack which grows high to low
         // Start from stack bottom (high address) --> stack top (low address)
