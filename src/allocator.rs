@@ -338,9 +338,38 @@ impl Allocator {
         self.print_heap_graph(&hg, "contains root to heap references");
     }
 
-    pub fn find_mem_leaks() {
-        // find garbage = leaked objects
-        // dfs on hg
+    pub fn graph_DFS(
+        &self,
+        start_node: *mut u8,
+        visited: &mut HashSet<*mut u8>,
+        hg: &mut HashMap<*mut u8, HashSet<*mut u8>>,
+    ) {
+        visited.insert(start_node);
+
+        let ref start = start_node;
+        // hg.get(start).map(|neighbors| {
+        //     for n in neighbors {
+        //         if !visited.contains(n) {
+        //             visited.insert(*n);
+        //             self.graph_DFS(*n, visited, hg);
+        //         }
+        //     }
+        // });
+    }
+
+    // Find leaked objects and garbage collect them
+    pub fn find_mem_leaks(&self, hg: &mut HashMap<*mut u8, HashSet<*mut u8>>) {
+        // Get list of pure heap objects
+        let mut heap_objs = HashSet::new();
+        for i in 0..self.blocks.len() {
+            self.blocks.get(i).map(|b| {
+                // println!("Inserting key in hg {:p}", b.payload);
+                heap_objs.insert(b.payload);
+            });
+        }
+
+        // First find all non-leaked objects. Run DFS from all root pointer entries in
+        // the hg. Track all visited heap objects. Those that are not visited are leaked.
     }
 }
 
