@@ -225,8 +225,8 @@ void test_find_mem_leaks()
     rgc_garbage_collect_nice();
 
     // expected output
-    printf("Expected output is 6 heap objects are leaked \
-            the point container and all container elements \n");
+    printf("Expected output is 6 heap objects are leaked and cleaned "
+           "the point container and all container elements \n");
 }
 
 void print_root_mem_regions()

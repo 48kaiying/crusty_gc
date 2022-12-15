@@ -103,14 +103,20 @@ impl Allocator {
         return payload_ptr;
     }
 
-    fn free(&mut self, ptr: *mut u8) {
+    // Returns a tuple of the alloc request size and the actual alloc size
+    // for the block that has been freed.
+    fn free_verbose(&mut self, ptr: *mut u8) -> (usize, usize) {
         println!("alloc free");
 
         let mut rm_idx: Option<usize> = None;
+        let mut req_size = 0;
+        let mut size = 0;
         for i in 0..self.blocks.len() {
             self.blocks.get(i).map(|b| {
                 if b.payload == ptr {
                     rm_idx = Some(i);
+                    req_size = b.request_size;
+                    size = b.size;
                     println!("Found pointer match req size was = {}", b.request_size);
                     unsafe {
                         println!("Dropping ptr");
@@ -121,13 +127,34 @@ impl Allocator {
         }
 
         match rm_idx {
-            None => println!("Invalid free call"),
+            None => {
+                println!("Invalid free call");
+                return (0, 0);
+            }
             Some(i) => {
                 println!("Removing block at index {}", i);
                 let size_prev = self.blocks.len();
                 self.blocks.swap_remove(i);
                 assert_eq!(self.blocks.len(), size_prev - 1);
+                return (req_size, size);
             }
+        }
+    }
+
+    fn free(&mut self, ptr: *mut u8) {
+        self.free_verbose(ptr);
+    }
+
+    // Print all blocks with verbose info
+    pub fn inspect_blocks(&self) {
+        println!("Inspecting allocator blocks");
+        let mut count = 1;
+        for b in self.blocks.iter() {
+            println!(
+                "Alloc #{} - {:p} | {} bytes req | {} bytes alloced",
+                count, b.payload, b.request_size, b.size
+            );
+            count += 1;
         }
     }
 
@@ -175,7 +202,7 @@ impl Allocator {
     // Create new graph every sweep
     // TODO: optimize, only update graph with changes and don't make new
     pub fn create_heap_graph(
-        &self,
+        &mut self, // TODO: remove mut here
         etext: *const u8,
         end: *const u8,
         stack_top: *const u8,
@@ -244,7 +271,6 @@ impl Allocator {
     }
 
     pub fn scan_region(
-        &self,
         start: *const u8,
         end: *const u8,
         step: usize,
@@ -299,7 +325,7 @@ impl Allocator {
     // These variables are provided via the linux linker
     // TODO: move these variables to allocator initailizer since they don't change
     pub fn sweep_root_mem(
-        &self,
+        &mut self, // TODO: remove mut here
         etext: *const u8,
         end: *const u8,
         stack_top: *const u8,
@@ -328,7 +354,7 @@ impl Allocator {
         }
 
         let step = mem::size_of::<usize>() as usize;
-        self.scan_region(
+        Allocator::scan_region(
             etext_aligned as *const u8,
             end_aligned as *const u8,
             step,
@@ -351,7 +377,6 @@ impl Allocator {
     }
 
     pub fn graph_DFS(
-        &self,
         start_node: *mut u8,
         visited: &mut HashSet<*mut u8>,
         hg: &HashMap<*mut u8, HashSet<*mut u8>>,
@@ -360,21 +385,12 @@ impl Allocator {
 
         let ref start = start_node;
 
-        // hg.get(start).map(|neighbors| {
-        //     for n in neighbors {
-        //         if !visited.contains(n) {
-        //             visited.insert(*n);
-        //             self.graph_DFS(*n, visited, hg);
-        //         }
-        //     }
-        // });
-
         match hg.get(start) {
             Some(adj) => {
                 for n in adj {
                     if !visited.contains(n) {
                         visited.insert(*n);
-                        self.graph_DFS(*n, visited, hg);
+                        Allocator::graph_DFS(*n, visited, hg);
                     }
                 }
             }
@@ -383,7 +399,7 @@ impl Allocator {
     }
 
     // Find leaked objects and garbage collect them
-    pub fn find_mem_leaks(&self, hg: &HashMap<*mut u8, HashSet<*mut u8>>) {
+    pub fn find_mem_leaks(&mut self, hg: &HashMap<*mut u8, HashSet<*mut u8>>) {
         println!("Finding memory leaks");
 
         // Get list of pure heap objects
@@ -403,20 +419,32 @@ impl Allocator {
         for ptr in hg.keys() {
             // Run DFS on pointers that are root memory (are not heap objects)
             if !heap_objs.contains(ptr) {
-                self.graph_DFS(*ptr, &mut visited, hg);
+                Allocator::graph_DFS(*ptr, &mut visited, hg);
             }
         }
 
         Allocator::print_pointer_set(&visited, "visited pointers");
 
-        let mut leak_count = 1;
         // Find leaked objects -- values in heap_objs but not visited.
+        let mut leak_count = 1;
+        let mut garbage_size = 0;
         for leaked in heap_objs.difference(&visited) {
-            println!("Heap object #{} leaked {:p}", leak_count, *leaked);
+            println!(
+                "Heap object #{} leaked {:p} and cleaned",
+                leak_count, *leaked
+            );
+            // TODO: Free leaked block
+            let (_req_size, size) = self.free_verbose(*leaked);
+            garbage_size += size;
             leak_count += 1;
         }
 
-        // TODO: free leaked blocks
+        // Print gc collect summary
+        println!(
+            "Garbage collected {} objects freeing {} bytes",
+            leak_count - 1,
+            garbage_size
+        );
     }
 }
 
@@ -450,10 +478,11 @@ pub fn garbage_collect(
     stack_top: *const u8,
     stack_bottom: *const u8,
 ) {
-    let guard = ALLOCATOR.lock().unwrap();
+    let mut guard = ALLOCATOR.lock().unwrap();
     println!("Garbage collecting");
+    guard.inspect_blocks();
     guard.create_heap_graph(etext, end, stack_top, stack_bottom);
-    // guard.sweep_root_mem(etext, end);
+    guard.inspect_blocks();
 }
 
 pub fn alloc_clean() {
