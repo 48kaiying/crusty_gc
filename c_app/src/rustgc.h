@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdint.h>
 
 // Functions called in the Rust library
 extern void rust_test();
@@ -21,7 +20,7 @@ extern char edata;
 // This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
 extern char end;
 
-static __always_inline uint64_t rgc_stack_top()
+static __always_inline unsigned long rgc_stack_top()
 {
     // Get the top of the stack by moving the ebp register value to sp
     // %%rbp contains stack frame pointer (we do not use %%rsp)
@@ -37,13 +36,13 @@ static __always_inline uint64_t rgc_stack_top()
     // GCC inline asm: https://gcc.gnu.org/onlinedocs/gcc-4.4.7/gcc/Extended-Asm.html
     // Constraints https://gcc.gnu.org/onlinedocs/gcc-4.4.7/gcc/Simple-Constraints.html#Simple-Constraints
 
-    uint64_t stack_top = 0;
+    unsigned long stack_top = 0;
     asm volatile("movq %%rbp, %0"
                  : "=r"(stack_top));
     return stack_top;
 }
 
-static __always_inline void rgc_stack_bottom(uint64_t *stack_bottom)
+static __always_inline void rgc_stack_bottom(unsigned long *stack_bottom)
 {
     // Stack pointer is the 28th value in linux /proc/self/stat
     // See /proc/[pid]/stat section in https://man7.org/linux/man-pages/man5/proc.5.html
@@ -68,8 +67,9 @@ static __always_inline void rgc_stack_bottom(uint64_t *stack_bottom)
 
 static void __inline__ rgc_garbage_collect_nice()
 {
-    uint64_t stack_bottom = 0;
-    uint64_t stack_top = rgc_stack_top();
+    // Size of long is 8 bytes
+    unsigned long stack_bottom = 0;
+    unsigned long stack_top = rgc_stack_top();
     rgc_stack_bottom(&stack_bottom);
     printf("STACK TOP IS %p\n", (char *)stack_top);
     printf("STACK BOTTOM IS %p\n", (char *)stack_bottom);
