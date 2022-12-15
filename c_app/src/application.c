@@ -14,7 +14,7 @@ typedef struct Stack
     struct Stack_elt *head;
 } Stack;
 
-void stack_add(Stack *s, int v)
+Stack_elt *stack_add(Stack *s, int v)
 {
     Stack_elt *elem = (Stack_elt *)rgc_malloc(sizeof(Stack_elt));
     elem->value = v;
@@ -28,10 +28,13 @@ void stack_add(Stack *s, int v)
         elem->next = s->head;
         s->head = elem;
     }
+
+    return elem;
 }
 
 void stack_iterate(const Stack *s)
 {
+    printf("Iterating over stack obj %p\n", s);
     // Read values out
     if (s->head == NULL)
     {
@@ -46,19 +49,6 @@ void stack_iterate(const Stack *s)
         ++i;
     }
     printf("Stack Bottom\n");
-}
-
-void unused_test_heap_graph_stack()
-{
-    printf("Test heap graph stack\n");
-    Stack *s = (Stack *)rgc_malloc(sizeof(Stack));
-    s->head = NULL;
-    stack_add(s, 1);
-    stack_add(s, 2);
-    stack_add(s, 3);
-    stack_iterate(s);
-    printf("Stack object in C:  %p\n", s);
-    rgc_garbage_collect_nice();
 }
 
 typedef struct Point
@@ -207,6 +197,29 @@ void test_heap_and_global()
     }
 }
 
+Stack *make_stack()
+{
+    Stack *s = (Stack *)rgc_malloc(sizeof(Stack));
+    return s;
+}
+
+void test_scan_stack_region()
+{
+    printf("Test n");
+    Stack *s = make_stack();
+    s->head = NULL;
+    stack_add(s, 1);
+    stack_add(s, 2);
+    stack_add(s, 3);
+
+    rgc_garbage_collect_nice();
+
+    printf("Expected output from c:\n");
+    printf("Nothing is leaked.\n");
+    printf("Heap graph should contain root stack pointer reference %p to heap obj %p\n", &s, s);
+    stack_iterate(s);
+}
+
 void leak_point_container()
 {
     // Purposefully leak this point container and all elements inside
@@ -325,11 +338,16 @@ int main()
     // Test can find global ref to a heap object with heap refs
     printf("#################### Test 7 ####################\n");
     test_heap_and_global();
-#endif
 
     // Test find leaks
     printf("#################### Test 8 ####################\n");
     test_find_mem_leaks();
+
+#endif
+
+    // Test can find stack variables that point to heap objs
+    printf("#################### Test 9 ####################\n");
+    test_scan_stack_region();
 
     printf("Cleaning RGC\n");
     // Clean up

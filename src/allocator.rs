@@ -53,10 +53,14 @@ fn get_block_size(size: usize) -> usize {
     unimplemented!("Requested size is too large");
 }
 
+pub fn is_aligned_as_eight(addr: usize) -> bool {
+    return addr % 8 == 0;
+}
+
 // Makes sure an address is 8-byte aligned
 // Will round up unless round_down is true
 pub fn align_as_eight(addr: usize, round_down: bool) -> usize {
-    if addr % 8 != 0 {
+    if !is_aligned_as_eight(addr) {
         if round_down {
             return addr - (8 - addr % 8);
         } else {
@@ -364,11 +368,13 @@ impl Allocator {
 
         // Scan through stack which grows high to low
         // Start from stack bottom (high address) --> stack top (low address)
+        assert!(is_aligned_as_eight(stack_bottom as usize));
+        assert!(is_aligned_as_eight(stack_top as usize));
         println!(
-            "Sweep stack from bottom (high) {:p} to top (low) {:p}",
-            stack_bottom, stack_top
+            "Sweep stack from end/top (low) {:p} to start/bottom {:p}",
+            stack_top, stack_bottom
         );
-        // TODO: add scan region for stack with negative step
+        Allocator::scan_region(stack_top, stack_bottom, step, hg, objs);
 
         println!("Heap graph after sweeping root memory");
         self.print_heap_graph(&hg, "contains root to heap references");

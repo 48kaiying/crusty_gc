@@ -23,7 +23,7 @@ extern char end;
 static __always_inline unsigned long rgc_stack_top()
 {
     // Get the top of the stack by moving the ebp register value to sp
-    // %%rbp contains stack frame pointer (we do not use %%rsp)
+    // %%rsp is stack pointer and %%rbp is stack frame pointer
 
     // 64-bit system use %%rbp and movq (move quad word aka 8 bytes)
     // 32-bit system use %%ebp use movl (move double word aka 4 bytes)
@@ -65,7 +65,7 @@ static __always_inline void rgc_stack_bottom(unsigned long *stack_bottom)
     fclose(fp);
 }
 
-static void __inline__ rgc_garbage_collect_nice()
+static __attribute_noinline__ void rgc_garbage_collect_nice()
 {
     // Size of long is 8 bytes
     unsigned long stack_bottom = 0;
