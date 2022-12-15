@@ -24,8 +24,11 @@ static __always_inline void rgc_stack_top(long unsigned *stack_top)
 {
     // Get the top of the stack by moving the ebp register value to sp
     // %%ebp contains stack frame pointer (we do not use %esp)
-    __asm__ volatile("movl %ebp, %0"
-                     : "=r"((unsigned int *)stack_top));
+
+    // TODO: fix assembler warning
+    // __asm__ volatile("movl %ebp, %0"
+    //                  : "=r"((unsigned int *)stack_top));
+    *stack_top = 0;
 }
 
 static __always_inline void rgc_stack_bottom(long unsigned *stack_bottom)

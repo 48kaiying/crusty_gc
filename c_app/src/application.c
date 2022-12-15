@@ -207,6 +207,28 @@ void test_heap_and_global()
     }
 }
 
+void leak_point_container()
+{
+    // Purposefully leak this point container and all elements inside
+    Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
+    fill_point_container(pc);
+    printf("Leaking this point container and elements: ");
+    print_point_container(pc);
+}
+
+void test_find_mem_leaks()
+{
+    printf("Test leak point container and elements\n");
+    fill_point_container(&gpc_1);
+    fill_point_container(&gpc_2);
+    leak_point_container();
+    rgc_garbage_collect_nice();
+
+    // expected output
+    printf("Expected output is 6 heap objects are leaked \
+            the point container and all container elements \n");
+}
+
 void print_root_mem_regions()
 {
     printf("First address past:\n");
@@ -299,11 +321,15 @@ int main()
     // Test can find global to heap references
     printf("#################### Test 6 ####################\n");
     test_scan_data_region();
-#endif
 
     // Test can find global ref to a heap object with heap refs
     printf("#################### Test 7 ####################\n");
     test_heap_and_global();
+#endif
+
+    // Test find leaks
+    printf("#################### Test 8 ####################\n");
+    test_find_mem_leaks();
 
     printf("Cleaning RGC\n");
     // Clean up

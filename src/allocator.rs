@@ -168,6 +168,7 @@ impl Allocator {
         let mut count = 1;
         for item in hs {
             println!("Pointer #{} is {:p}", count, *item);
+            count += 1;
         }
     }
 
@@ -341,6 +342,7 @@ impl Allocator {
             "Sweep stack from bottom (high) {:p} to top (low) {:p}",
             stack_bottom, stack_top
         );
+        // TODO: add scan region for stack with negative step
 
         println!("Heap graph after sweeping root memory");
         self.print_heap_graph(&hg, "contains root to heap references");
@@ -407,9 +409,11 @@ impl Allocator {
 
         Allocator::print_pointer_set(&visited, "visited pointers");
 
+        let mut leak_count = 1;
         // Find leaked objects -- values in heap_objs but not visited.
         for leaked in heap_objs.difference(&visited) {
-            println!("Heap object ptr leaked {:p}", leaked);
+            println!("Heap object #{} leaked {:p}", leak_count, *leaked);
+            leak_count += 1;
         }
 
         // TODO: free leaked blocks
