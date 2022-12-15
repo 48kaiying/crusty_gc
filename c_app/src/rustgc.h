@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 
 // Functions called in the Rust library
 extern void rust_test();
@@ -20,18 +21,29 @@ extern char edata;
 // This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
 extern char end;
 
-static __always_inline void rgc_stack_top(long unsigned *stack_top)
+static __always_inline uint64_t rgc_stack_top()
 {
     // Get the top of the stack by moving the ebp register value to sp
-    // %%ebp contains stack frame pointer (we do not use %esp)
+    // %%rbp contains stack frame pointer (we do not use %%rsp)
 
-    // TODO: fix assembler warning
-    // __asm__ volatile("movl %ebp, %0"
-    //                  : "=r"((unsigned int *)stack_top));
-    *stack_top = 0;
+    // 64-bit system use %%rbp and movq (move quad word aka 8 bytes)
+    // 32-bit system use %%ebp use movl (move double word aka 4 bytes)
+
+    // Linux is at&t syntax so OPCODE SRC DEST
+    // The `=` in `=r` means that the operand is an output.
+    // The `r` is an operand contraint and says the operand may be in a register
+    // as long as it is in a general register.
+
+    // GCC inline asm: https://gcc.gnu.org/onlinedocs/gcc-4.4.7/gcc/Extended-Asm.html
+    // Constraints https://gcc.gnu.org/onlinedocs/gcc-4.4.7/gcc/Simple-Constraints.html#Simple-Constraints
+
+    uint64_t stack_top = 0;
+    asm volatile("movq %%rbp, %0"
+                 : "=r"(stack_top));
+    return stack_top;
 }
 
-static __always_inline void rgc_stack_bottom(long unsigned *stack_bottom)
+static __always_inline void rgc_stack_bottom(uint64_t *stack_bottom)
 {
     // Stack pointer is the 28th value in linux /proc/self/stat
     // See /proc/[pid]/stat section in https://man7.org/linux/man-pages/man5/proc.5.html
@@ -56,9 +68,10 @@ static __always_inline void rgc_stack_bottom(long unsigned *stack_bottom)
 
 static void __inline__ rgc_garbage_collect_nice()
 {
-    long unsigned stack_top;
-    long unsigned stack_bottom;
-    rgc_stack_top(&stack_top);
+    uint64_t stack_bottom = 0;
+    uint64_t stack_top = rgc_stack_top();
     rgc_stack_bottom(&stack_bottom);
-    rgc_garbage_collect(&etext, &end, (char *)&stack_top, (char *)&stack_bottom);
+    printf("STACK TOP IS %p\n", (char *)stack_top);
+    printf("STACK BOTTOM IS %p\n", (char *)stack_bottom);
+    rgc_garbage_collect(&etext, &end, (char *)stack_top, (char *)stack_bottom);
 }
