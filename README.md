@@ -10,9 +10,9 @@ The University of Pennsylvania
 
 # Abstract 
 
-Rust Garbage Collector (RGC) is a garbage collector for C programming inspired by the Boehm garbage collector. Garbage collection is form of automatic memory management which attempts to reclaim garbage -- memory that is no longer referenced -- by the program. RGC provides API call `rgc_malloc` which allocates heap memory similar to the standard `malloc` call. RGC also provides a API call `rgc_garbage_collect` which determines garbage at the current program execution point and clears the memory thereby freeing developers from having to manually release memory (calling `free` explicitly). 
+Rust Garbage Collector (RGC) is a garbage collector for C programming inspired by the Boehm garbage collector. Garbage collection is form of automatic memory management which attempts to reclaim garbage -- memory that is no longer referenced -- by the program. RGC provides API call `rgc_malloc` which allocates heap memory similar to the standard `malloc` call. RGC also provides a API call `rgc_garbage_collect` which determines garbage at the current program execution point and clears the memory thereby freeing developers from having to manually release memory (calling `free` explicitly). RGC only works for **single threaded C programs running on x86-64 Linux** since the code is reliant on the Linux kernel.
 
-Furthermore, RGC only works for **single threaded C programs running on x86-64 Linux**. The project is not meant to be a robust or wholly correct garbage collector to be used for actual garbage collection as there are bugs that have not been hashed out. It is more of an academic endeavor for myself to demystify garbage collection and an opportunity to learn Rust. 
+This project was created with the purpose of learning Rust and is an academic endeavor to demystify garbage collection for myself. RGC is not meant to be a robust or wholly correct garbage collector to be used for production/serious software as there are bugs that have not been hashed out.
 
 Google slides for the final project presentation explaining the algorithm and implementation can be found [at this link here](https://docs.google.com/presentation/d/1FYoHnk3ZLhpRNy4YOdfhOIGkaC9evFwXEp_KMASxNkA/edit#slide=id.g180cc10c6d2_0_9.).
 
@@ -39,7 +39,9 @@ The project will make the following contributions:
 
 ## Design Goals
 
-This project is of interest to people who want to learn about Rust, garbage collection, memory leak detection, and memory management. The audience will benefit from being able to write their own RGC and to use this one to collect garbage in a naive single threaded C program.
+This project is of interest to people who want to learn about Rust, garbage collection, memory leak detection, and memory management. The audience will benefit from being able to write their own RGC and to use this one to collect garbage in a naive single threaded C program. 
+
+The users of my project are C programmers who want a garbage collector. 
 
 ## Project Proposed Features and Functionality
 
@@ -125,4 +127,31 @@ The following is an example:
 
 // TODO: add valgrind output 
 
-#
+# Project Timeline 
+
+The following is a speculated pace of the project. 
+
+1. September: Research about garbage collection, write proposal, get familiar with Rust
+2. October: Create a development env, develope methods for testing, implement the allocator fleshing calls `rgc_init`, `rgc_malloc`, `rgc_free`, and `rgc_cleanup`.
+3. November: Implement leak detection and garbage collection fleshing the call `rgc_garbage_collect`.
+4. December: Stretch goals, debugging, robust testing, presenting
+
+## Project Future Tasks
+
+- Implement parallel garbage collection by garbage collecting on another thread so that RGC does not stop the main project execution
+- Flesh out garbage collection data by collecting runtime type information and displaying to user 
+- Optimize the memory allocator
+
+## Method 
+
+This project had a particularly rough start.
+// TODO: complete 
+
+## Results
+
+// TODO: add results
+
+## Conclusion & Future Work
+
+In the end, I was able to complete the goal I had in mind. 
+
