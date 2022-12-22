@@ -374,12 +374,12 @@ impl Allocator {
             "Sweep stack from end/top (low) {:p} to start/bottom {:p}",
             stack_top, stack_bottom
         );
-        Allocator::scan_region(stack_top, stack_bottom, step, hg, objs);
+        // Allocator::scan_region(stack_top, stack_bottom, step, hg, objs);
 
         println!("Heap graph after sweeping root memory");
         self.print_heap_graph(&hg, "contains root to heap references");
 
-        self.find_mem_leaks(&hg);
+        // self.find_mem_leaks(&hg);
     }
 
     pub fn graph_DFS(

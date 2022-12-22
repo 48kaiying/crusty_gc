@@ -45,7 +45,7 @@ void stack_iterate(const Stack *s)
     int i = 1;
     for (Stack_elt *t = s->head; t != NULL; t = t->next)
     {
-        printf("Stack Item #%d : %d\n", i, t->value);
+        printf("Stack Item Obj %p #%d : %d\n", t, i, t->value);
         ++i;
     }
     printf("Stack Bottom\n");
@@ -343,11 +343,22 @@ int main()
     printf("#################### Test 8 ####################\n");
     test_find_mem_leaks();
 
-#endif
-
     // Test can find stack variables that point to heap objs
     printf("#################### Test 9 ####################\n");
     test_scan_stack_region();
+#endif
+
+    // Test find leaks
+    printf("#################### Test 8 ####################\n");
+    test_find_mem_leaks();
+
+    // // Test can find stack variables that point to heap objs
+    // printf("#################### Test 9 ####################\n");
+    // test_scan_stack_region();
+
+    // // Test can find global ref to a heap object with heap refs
+    // printf("#################### Test 7 ####################\n");
+    // test_heap_and_global();
 
     printf("Cleaning RGC\n");
     // Clean up

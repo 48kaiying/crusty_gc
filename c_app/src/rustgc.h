@@ -1,10 +1,6 @@
 #include <stdio.h>
 
 // Functions called in the Rust library
-extern void rust_test();
-extern int rust_test2(int);
-extern void rust_string(char *);
-
 extern void rgc_init();
 extern void rgc_cleanup();
 extern char *rgc_malloc(unsigned long);
@@ -14,11 +10,11 @@ extern void rgc_garbage_collect(char *, char *, char *, char *);
 // This is the first address past the end of the text segment (the program code).
 extern char etext;
 
-// This is the first address past the end of the initialized data segment.
-extern char edata;
-
 // This is the first address past the end of the uninitialized data segment (also known as the BSS segment).
 extern char end;
+
+// This is the first address past the end of the initialized data segment.
+extern char edata;
 
 static __always_inline unsigned long rgc_stack_top()
 {
