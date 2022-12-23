@@ -12,7 +12,7 @@ pub extern "C" fn rgc_malloc(size: isize) -> *mut u8 {
         return 0 as *mut u8;
     }
 
-    println!("rgc malloc requested {}", size);
+    // println!("rgc malloc requested {}", size);
 
     return allocator::malloc(size as usize);
 }

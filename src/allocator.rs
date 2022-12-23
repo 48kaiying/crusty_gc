@@ -45,7 +45,7 @@ fn get_block_size(size: usize) -> usize {
 
     for s in sizes {
         if size < s {
-            println!("Returning size {}", s);
+            // println!("Returning size {}", s);
             return s;
         }
     }
@@ -84,7 +84,7 @@ impl Allocator {
     }
 
     fn malloc(&mut self, size: usize) -> *mut u8 {
-        println!("alloc malloc");
+        // println!("alloc malloc");
         let m_size: usize = get_block_size(size);
         let mem: Vec<u8> = vec![0; m_size];
         let mut payload = mem.into_boxed_slice();
@@ -102,7 +102,7 @@ impl Allocator {
         };
 
         self.blocks.push(new_block);
-        println!("num blocks = {}", self.blocks.len());
+        // println!("num blocks = {}", self.blocks.len());
 
         return payload_ptr;
     }
@@ -110,8 +110,7 @@ impl Allocator {
     // Returns a tuple of the alloc request size and the actual alloc size
     // for the block that has been freed.
     fn free_verbose(&mut self, ptr: *mut u8) -> (usize, usize) {
-        println!("alloc free");
-
+        // println!("alloc free");
         let mut rm_idx: Option<usize> = None;
         let mut req_size = 0;
         let mut size = 0;
@@ -121,9 +120,9 @@ impl Allocator {
                     rm_idx = Some(i);
                     req_size = b.request_size;
                     size = b.size;
-                    println!("Found pointer match req size was = {}", b.request_size);
+                    // println!("Found pointer match req size was = {}", b.request_size);
                     unsafe {
-                        println!("Dropping ptr");
+                        // println!("Dropping ptr");
                         Box::from_raw(ptr);
                     }
                 }
@@ -136,7 +135,7 @@ impl Allocator {
                 return (0, 0);
             }
             Some(i) => {
-                println!("Removing block at index {}", i);
+                // println!("Removing block at index {}", i);
                 let size_prev = self.blocks.len();
                 self.blocks.swap_remove(i);
                 assert_eq!(self.blocks.len(), size_prev - 1);
@@ -379,7 +378,7 @@ impl Allocator {
         println!("Heap graph after sweeping root memory");
         self.print_heap_graph(&hg, "contains root to heap references");
 
-        // self.find_mem_leaks(&hg);
+        self.find_mem_leaks(&hg);
     }
 
     pub fn graph_DFS(
@@ -417,7 +416,7 @@ impl Allocator {
             });
         }
 
-        Allocator::print_pointer_set(&heap_objs, "heap objects");
+        // Allocator::print_pointer_set(&heap_objs, "heap objects");
 
         // First find all non-leaked objects. Run DFS from all root pointer entries in
         // the hg. Track all visited heap objects. Those that are not visited are leaked.
@@ -429,17 +428,17 @@ impl Allocator {
             }
         }
 
-        Allocator::print_pointer_set(&visited, "visited pointers");
+        // Allocator::print_pointer_set(&visited, "visited pointers");
 
         // Find leaked objects -- values in heap_objs but not visited.
         let mut leak_count = 1;
         let mut garbage_size = 0;
         for leaked in heap_objs.difference(&visited) {
             println!(
-                "Heap object #{} leaked {:p} and cleaned",
+                "RGC SUMMARY: Heap object #{} leaked {:p} and cleaned",
                 leak_count, *leaked
             );
-            // TODO: Free leaked block
+            // Free leaked block
             let (_req_size, size) = self.free_verbose(*leaked);
             garbage_size += size;
             leak_count += 1;
@@ -447,7 +446,7 @@ impl Allocator {
 
         // Print gc collect summary
         println!(
-            "Garbage collected {} objects freeing {} bytes",
+            "RGC SUMMARY: Garbage collected {} objects freeing {} bytes",
             leak_count - 1,
             garbage_size
         );
@@ -456,7 +455,7 @@ impl Allocator {
 
 impl Drop for Allocator {
     fn drop(&mut self) {
-        println!("Allocator dropped");
+        // println!("Allocator dropped");
         self.blocks.clear();
     }
 }
@@ -473,7 +472,7 @@ pub fn malloc(size: usize) -> *mut u8 {
 pub fn free(ptr: *mut u8) {
     if !ptr.is_null() {
         let mut guard = ALLOCATOR.lock().unwrap();
-        println!("calling free");
+        // println!("calling free");
         return guard.free(ptr);
     }
 }
@@ -485,7 +484,7 @@ pub fn garbage_collect(
     stack_bottom: *const u8,
 ) {
     let mut guard = ALLOCATOR.lock().unwrap();
-    println!("Garbage collecting");
+    // println!("Garbage collecting");
     guard.inspect_blocks();
     guard.create_heap_graph(etext, end, stack_top, stack_bottom);
     guard.inspect_blocks();
@@ -493,10 +492,6 @@ pub fn garbage_collect(
 
 pub fn alloc_clean() {
     // TODO: fix me, allocator doesn't clean up
-    println!(
-        "size of mutex allocator {}",
-        std::mem::size_of::<Mutex<Allocator>>()
-    );
     let guard = ALLOCATOR.lock().unwrap();
     // drop(guard);
     std::mem::drop(guard);

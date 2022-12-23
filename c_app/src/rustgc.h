@@ -81,7 +81,5 @@ static __attribute_noinline__ void rgc_garbage_collect_nice()
     unsigned long stack_bottom = 0;
     unsigned long stack_top = rgc_stack_top();
     rgc_stack_bottom(&stack_bottom);
-    printf("STACK TOP IS %p\n", (char *)stack_top);
-    printf("STACK BOTTOM IS %p\n", (char *)stack_bottom);
     rgc_garbage_collect(&etext, &end, (char *)stack_top, (char *)stack_bottom);
 }
