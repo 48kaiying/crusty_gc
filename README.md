@@ -194,7 +194,7 @@ By the end of this section, I was able to allocate and de-allocate memory using 
 
 Now that I am able to track and identify all heap allocations, the next step is identifying what is garbage. Garbage is any heap allocation that can not be reference to by the user during the program execution point. Thus, we need to be able to know what heap allocations have references to it.
 
-What can point to a heap allocation? Well, another heap allocation! This is the case for instance, when we allocate a `struct A` which stores a pointer to another heap allocated `struct B`. See the following test case `test_heap_graph()` in `c_app/application.c` which contains a heap allocated `Point_container` which itself stores five pointers to heap allocated `Point` structs. 
+What can point to a heap allocation? Well, another heap allocation! This is the case for instance, when we allocate a `struct A` which stores a pointer to another heap allocated `struct B`. See the following test case `test_heap_graph()` in `c_app/application.c` which contains a heap allocated `Point_container` which itself stores five pointers to heap allocated `Point` structs. See `test_heap_graph()` test case in `c_app/application.c`. 
 
 ```c
 typedef struct Point_container
@@ -231,25 +231,223 @@ For implementation, the heap graph is a `HashMap` which uses a heap object point
 
 By the end of this section, I had also implemented logging which printed the contents of the heap graph and saw the expected outcome - there is a heap allocation (the point container) which contains 5 other heap references (the points). 
 
-### 4. Root Memory to Heap References
+The following is the test output. "Inspecting Allocator Blocks" prints all the blocks in the allocator. Here we see after "Printing heap graph with only heap to heap references", there are 6 nodes in the graph and only one contains 5 references. That makes sense since only `pc` contains references to `points`. The `H` in front of the memory address identifies that the address is a heap pointer, this will be relevant in the next section. 
+
+```
+#################### Test 5 ####################
+Test heap graph point container
+Inspecting allocator blocks
+Alloc #1 - 0x55d246c05af0 | 40 bytes req | 521 bytes alloced
+Alloc #2 - 0x55d246c05da0 | 16 bytes req | 521 bytes alloced
+Alloc #3 - 0x55d246c05fc0 | 16 bytes req | 521 bytes alloced
+Alloc #4 - 0x55d246c061e0 | 16 bytes req | 521 bytes alloced
+Alloc #5 - 0x55d246c06400 | 16 bytes req | 521 bytes alloced
+Alloc #6 - 0x55d246c06730 | 16 bytes req | 521 bytes alloced
+Printing heap graph with only heap to heap references
+H 0x55d246c06400 contains 0 heap reference(s): 
+H 0x55d246c05da0 contains 0 heap reference(s): 
+H 0x55d246c06730 contains 0 heap reference(s): 
+H 0x55d246c05af0 contains 5 heap reference(s): 0x55d246c05da0, 0x55d246c061e0, 0x55d246c06400, 0x55d246c05fc0, 0x55d246c06730, 
+H 0x55d246c061e0 contains 0 heap reference(s): 
+H 0x55d246c05fc0 contains 0 heap reference(s): 
+```
+
+### 4. Root Memory to Heap References (Data Region)
 
 Now that we know what heap objects point to other heap objects, we need to consider what else can point to a heap object? A global data structure or a local variable! By this point of the project, I could see that there was a trend. I needed to iterate over memory regions from a start address to and end address 8 bytes at a time looking for potential references modifying my heap graph. Thus, I refactored my code and wrote a `scan_region(...)` function which would do just that. 
 
 The parts of memory that are accessible by the user during execution is called root memory. This contains globals, stack (local variables), and registers. In a multi-threaded program we would also include thread stack and thread registers, but that is beyond the scope of this project.
 
+The following test case `test_scan_data_region()` contains two global variables `gcp_1` and `gcp_2` which both contain heap references.
+```c
+struct Point_container gpc_1 = {
+    .first = NULL,
+    .sec = NULL,
+    .third = NULL,
+    .fourth = NULL,
+    .fifth = NULL,
+};
+
+struct Point_container gpc_2 = {
+    .first = NULL,
+    .sec = NULL,
+    .third = NULL,
+    .fourth = NULL,
+    .fifth = NULL,
+};
+
+void test_scan_data_region()
+{
+    printf("Test scan data region\n");
+    fill_point_container(&gpc_1);
+    fill_point_container(&gpc_2);
+    rgc_garbage_collect_nice();
+
+    printf("Expected output is a new heap object %p with 5 references:\n", &gpc_1);
+    printf("Global gpc_1:\n");
+    print_point_container(&gpc_1);
+    printf("Global gpc_2:\n");
+    print_point_container(&gpc_2);
+}
+```
+
 This was a tricky part of the project that required a lot of research, but not that much code. I needed to figure out how exactly the Linux kernel formats memory for a C program and how I could have access to the data and stack regions. Good thing there are a lot of manuals for this. 
 
 Reading [the Linux man page](https://linux.die.net/man/3/etext), I discovered that Unix systems declare symbols `etext` and `end` which contains the first address past the text segment (which is the start of the initialized data segment) and the first address pass the BSS data segment respectively. These symbols needed to be explicitly declared in the C program, thus I declared them in the RGC API. RGC would be passed the `etext` and `end` addresses. While scanning this data region, initially no heap references were found. It wasn't until closer examination did I realize that `etext` was not always 8-byte aligned. Thus, I was incorrectly iterating over the region misaligned. I am not sure about the correctness of this part, but to fix the issue I made sure that `etext` was an 8 byte aligned address and rounded the address down. This seemed to fix the issue and I began to see root references to heap objects in the heap graph. 
+
+The following is the heap graph after scanning the data regions for `test_scan_data_region()`. Here we see that the graph now contain root memory keys denoted by `R`. There are two global variable `gpc_1` and `gpc_2` and each of them contain 5 references, so we should see 10 unique heap references as values in the heap graph which we do.
+
+```
+#################### Test 6 ####################
+...
+Scan region from 0x55e1ce073b28 to 0x55e1ce0760c8 (range 9632) with step 8-bytes
+Heap graph after sweeping root memory
+Printing heap graph contains root to heap references
+R 0x55e1ce076050 contains 1 heap reference(s): 0x55e1ce9eefc0, 
+H 0x55e1ce9eeda0 contains 0 heap reference(s): 
+R 0x55e1ce076060 contains 1 heap reference(s): 0x55e1ce9ef400, 
+H 0x55e1ce9f01c0 contains 0 heap reference(s): 
+H 0x55e1ce9ef1e0 contains 0 heap reference(s): 
+R 0x55e1ce076058 contains 1 heap reference(s): 0x55e1ce9ef1e0, 
+H 0x55e1ce9ef730 contains 0 heap reference(s): 
+R 0x55e1ce076048 contains 1 heap reference(s): 0x55e1ce9eeda0, 
+R 0x55e1ce076088 contains 1 heap reference(s): 0x55e1ce9ef950, 
+H 0x55e1ce9eeaf0 contains 0 heap reference(s): 
+R 0x55e1ce076080 contains 1 heap reference(s): 0x55e1ce9ef730, 
+H 0x55e1ce9efd90 contains 0 heap reference(s): 
+H 0x55e1ce9ef400 contains 0 heap reference(s): 
+R 0x55e1ce076040 contains 1 heap reference(s): 0x55e1ce9eeaf0, 
+H 0x55e1ce9eefc0 contains 0 heap reference(s): 
+R 0x55e1ce076090 contains 1 heap reference(s): 0x55e1ce9efb70, 
+H 0x55e1ce9efb70 contains 0 heap reference(s): 
+H 0x55e1ce9ef950 contains 0 heap reference(s): 
+R 0x55e1ce0760a0 contains 1 heap reference(s): 0x55e1ce9f01c0, 
+R 0x55e1ce076098 contains 1 heap reference(s): 0x55e1ce9efd90, 
+```
+
+### 5. Root Memory to Heap References (Stack Region)
 
 The next step was to scan the execution stack for heap pointers. First, I identified the stack bottom by reading the `proc/self/stat` file for the 28th value. According to [the Linux man page](https://man7.org/linux/man-pages/man5/proc.5.html), the Linux kernel logs a ton of information about a process in a `proc/[pid]/stat` file and the 28th value is the start of the stack. Next, I needed to figure out how to get the stack top address. This part was straight forward but took me a bit of time to figure out. In x86-64, the `rsp` register stores the stack pointer and the `rbp` register stores the stack frame pointer. Using GCC inline assembly, I was able to write the `rbp` value to a local variable. The outcome of this section is only three lines but took me a lot of research since it was the first time I was writing asm in C. It also took me some time to figure out the correct `mov` instruction to use and what the exact types of the operands should be. I did not even know there were different mov instructions. With the stack start and end addresses, I was able to find local variable references to heap objects. 
 
 While scanning root memory regions, new keys needed to be added to the heap graph. These keys are root memory addresses that only contain a single heap reference in the HashSet.
 
-### 5. Finding Memory Leaks & Cleaning it Up
+The following test case stores an allocated `stack` object in a local variable `s`. Each element in the stack is heap allocated. 
+
+```c
+Stack *make_stack()
+{
+    Stack *s = (Stack *)rgc_malloc(sizeof(Stack));
+    return s;
+}
+
+void test_scan_stack_region()
+{
+    printf("Test n");
+    Stack *s = make_stack(); // local variable points to heap obj 
+    s->head = NULL;
+    stack_add(s, 1);
+    stack_add(s, 2);
+    stack_add(s, 3);
+
+    rgc_garbage_collect_nice();
+
+    printf("Expected output from c:\n");
+    printf("Nothing is leaked.\n");
+    printf("Heap graph should contain root stack pointer reference %p to heap obj %p\n", &s, s);
+    stack_iterate(s);
+}
+```
+
+The following is the output. It is as we expect, there contains one root pointer (the address local var `s`) which points to a heap reference and all but one heap reference should point to another heap reference (stack elements point to the next stack element). Here we see there is only one `R` root pointer. 
+```
+#################### Test 9 ####################
+Test stack implementation
+...
+Sweep stack from end/top (low) 0x7ffe245f17e0 to start/bottom 0x7ffe245f1900
+Scan region from 0x7ffe245f17e0 to 0x7ffe245f1900 (range 288) with step 8-bytes
+Heap graph after sweeping root memory
+Printing heap graph contains root to heap references
+H 0x5653abe2ada0 contains 0 heap reference(s): 
+R 0x7ffe245f17f0 contains 1 heap reference(s): 0x5653abe2aaf0, 
+H 0x5653abe2b1e0 contains 1 heap reference(s): 0x5653abe2afc0, 
+H 0x5653abe2aaf0 contains 1 heap reference(s): 0x5653abe2b1e0, 
+H 0x5653abe2afc0 contains 1 heap reference(s): 0x5653abe2ada0, 
+RGC SUMMARY: Garbage collected 0 objects freeing 0 bytes
+...
+Expected output from c:
+Nothing is leaked.
+Heap graph should contain root stack pointer reference 0x7ffe245f17f0 to heap obj 0x5653abe2aaf0
+Iterating over stack obj 0x5653abe2aaf0
+Stack Item Obj 0x5653abe2b1e0 #1 : 3
+Stack Item Obj 0x5653abe2afc0 #2 : 2
+Stack Item Obj 0x5653abe2ada0 #3 : 1
+Stack Bottom
+Cleaning RGC
+```
+
+### 6. Finding Memory Leaks & Cleaning it Up
 
 With this graph of heap references, I was finally able to find memory leaks to clean. A heap object is leaked if there is no way the user can access the object. In reverse, a heap object is not leaked if it is reachable from some root memory. Thus, the algorithm for identifying leaks is just depth first search (DFS) graph traversal. Iterating over the keys in the heap graph, I identified keys that were a root memory addresses and not heap object address, and ran DFS from these nodes. To find what was leaked, I just took the set difference of all the heap objects and the heap objects that were visited in the traversal.
 
 Since `rgc_free` was already implemented, cleaning up the garbage was iterating over all the leaked objects and calling the method on the payload. This also removed the allocator block to it.
+
+For the following test case we should expect RGC to find and collect the leaked point container. 
+
+```c
+void leak_point_container()
+{
+    // Purposefully leak this point container and all elements inside
+    Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
+    fill_point_container(pc);
+    printf("Leaking this point container and elements: ");
+    print_point_container(pc);
+}
+
+void test_find_mem_leaks()
+{
+    printf("Test leak point container and elements\n");
+    fill_point_container(&gpc_1);
+    fill_point_container(&gpc_2);
+    leak_point_container();
+    rgc_garbage_collect_nice();
+
+    // expected output
+    printf("Expected output is 6 heap objects are leaked and cleaned "the point container and all container elements \n");
+}
+```
+
+The RGC output of the test checks out and shows all that was cleaned 
+```
+#################### Test 8 ####################
+Test leak point container and elements
+...
+RGC: Heap object #1 leaked 0x56066d8c6c60 and cleaned
+RGC: Heap object #2 leaked 0x56066d8c6600 and cleaned
+RGC: Heap object #3 leaked 0x56066d8c6820 and cleaned
+RGC: Heap object #4 leaked 0x56066d8c6a40 and cleaned
+RGC: Heap object #5 leaked 0x56066d8c6e80 and cleaned
+RGC: Heap object #6 leaked 0x56066d8c63e0 and cleaned
+RGC SUMMARY: Garbage collected 6 objects freeing 3126 bytes
+```
+
+Checking valgrind with `rgc_garbage_collect_nice()`:
+```
+==6303== LEAK SUMMARY:
+==6303==    definitely lost: 0 bytes in 0 blocks
+==6303==    indirectly lost: 0 bytes in 0 blocks
+==6303==      possibly lost: 0 bytes in 0 blocks
+==6303==    still reachable: 6,786 bytes in 13 blocks
+==6303==         suppressed: 0 bytes in 0 blocks
+```
+
+Checking valgrind without `rgc_garbage_collect_nice()`:
+```
+==10938==    definitely lost: 0 bytes in 0 blocks
+==10938==    indirectly lost: 0 bytes in 0 blocks
+==10938==      possibly lost: 0 bytes in 0 blocks
+==10938==    still reachable: 9,912 bytes in 19 blocks
+==10938==         suppressed: 0 bytes in 0 blocks
+```
 
 ## Conclusion & Future Work
 

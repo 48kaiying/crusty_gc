@@ -34,6 +34,11 @@ Stack_elt *stack_add(Stack *s, int v)
 
 void stack_iterate(const Stack *s)
 {
+    if (s == NULL)
+    {
+        return;
+    }
+
     printf("Iterating over stack obj %p\n", s);
     // Read values out
     if (s->head == NULL)
@@ -205,7 +210,7 @@ Stack *make_stack()
 
 void test_scan_stack_region()
 {
-    printf("Test n");
+    printf("Test stack implementation\n");
     Stack *s = make_stack();
     s->head = NULL;
     stack_add(s, 1);
@@ -344,17 +349,10 @@ int main()
     test_scan_stack_region();
 #endif
 
+    // Manually move the test cases here in order to see them run
     // Test find leaks
     printf("#################### Test 8 ####################\n");
     test_find_mem_leaks();
-
-    // // Test can find stack variables that point to heap objs
-    // printf("#################### Test 9 ####################\n");
-    // test_scan_stack_region();
-
-    // // Test can find global ref to a heap object with heap refs
-    // printf("#################### Test 7 ####################\n");
-    // test_heap_and_global();
 
     printf("Cleaning RGC\n");
     // Clean up
