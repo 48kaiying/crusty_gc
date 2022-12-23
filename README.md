@@ -203,8 +203,6 @@ For implementation, the heap graph is a `HashMap` which uses a heap object point
 
 By the end of this section, I had also implemented logging which printed the contents of the heap graph and saw the expected outcome - there is a heap allocation (the point container) which contains 5 other heap references (the points). 
 
-// TODO: run and add logging 
-
 ### 4. Root Memory to Heap References
 
 Now that we know what heap objects point to other heap objects, we need to consider what else can point to a heap object? A global data structure or a local variable! By this point of the project, I could see that there was a trend. I needed to iterate over memory regions from a start address to and end address 8 bytes at a time looking for potential references modifying my heap graph. Thus, I refactored my code and wrote a `scan_region(...)` function which would do just that. 
@@ -213,11 +211,25 @@ The parts of memory that are accessible by the user during execution is called r
 
 This was a tricky part of the project that required a lot of research, but not that much code. I needed to figure out how exactly the Linux kernel formats memory for a C program and how I could have access to the data and stack regions. Good thing there are a lot of manuals for this. 
 
-Reading [the Linux man page](https://linux.die.net/man/3/etext), I discovered that Unix systems declare symbols `etext` and `end` which contains the first address past the text segment (which is the start of the initialized data segment) and the first address pass the BSS data segment respectively. I need to declare these symbols in the C program in order to get the information. At this point I decided that RGC would be passed the `etext` and `end` addresses. While scanning this data region, I initially could not find any heap references for my test case. It wasn't until I looked more closely did I realize that`etext` was not always 8-byte aligned. Thus, I was iterating over the region misaligned. I am not sure about the correctness of this part, but to fix the issue I made sure that `etext` was an 8 byte aligned address and rounded down. This seemed to fix the issue and I began to see root references to heap objects in the heap graph. 
+Reading [the Linux man page](https://linux.die.net/man/3/etext), I discovered that Unix systems declare symbols `etext` and `end` which contains the first address past the text segment (which is the start of the initialized data segment) and the first address pass the BSS data segment respectively. These symbols needed to be explicitly declared in the C program, thus I declared them in the RGC API. RGC would be passed the `etext` and `end` addresses. While scanning this data region, initially no heap references were found. It wasn't until closer examination did I realize that `etext` was not always 8-byte aligned. Thus, I was incorrectly iterating over the region misaligned. I am not sure about the correctness of this part, but to fix the issue I made sure that `etext` was an 8 byte aligned address and rounded the address down. This seemed to fix the issue and I began to see root references to heap objects in the heap graph. 
+
+The next step was to scan the execution stack for heap pointers. First, I identified the stack bottom by reading the `proc/self/stat` file for the 28th value. According to [the Linux man page](https://man7.org/linux/man-pages/man5/proc.5.html), the Linux kernel logs a ton of information about a process in a `proc/[pid]/stat` file and the 28th value is the start of the stack. Next, I needed to figure out how to get the stack top address. This part was straight forward but took me a bit of time to figure out. In x86-64, the `rsp` register stores the stack pointer and the `rbp` register stores the stack frame pointer. Using GCC inline assembly, I was able to write the `rbp` value to a local variable. The outcome of this section is only three lines but took me a lot of research since it was the first time I was writing asm in C. It also took me some time to figure out the correct `mov` instruction to use and what the exact types of the operands should be. I did not even know there were different mov instructions. With the stack start and end addresses, I was able to find local variable references to heap objects. 
+
+While scanning root memory regions, new keys needed to be added to the heap graph. These keys are root memory addresses that only contain a single heap reference in the HashSet.
 
 ### 5. Finding Memory Leaks & Cleaning it Up
 
+With this graph of heap references, I was finally able to find memory leaks to clean. A heap object is leaked if there is no way the user can access the object. In reverse, a heap object is not leaked if it is reachable from some root memory. Thus, the algorithm for identifying leaks is just depth first search (DFS) graph traversal. Iterating over the keys in the heap graph, I identified keys that were a root memory addresses and not heap object address, and ran DFS from these nodes. To find what was leaked, I just took the set difference of all the heap objects and the heap objects that were visited in the traversal.
+
+Since `rgc_free` was already implemented, cleaning up the garbage was iterating over all the leaked objects and calling the method on the payload. This also removed the allocator block to it.
+
 ## Conclusion & Future Work
 
-In the end, I was able to complete the goal I had in mind even though it was not exactly how I planned. I learned a lot of Rust, more about memory, 
+In the end, I was able to complete the goal I had in mind even though it was not easy and not exactly how I planned. I feel comfortable writing Rust now and have a good understanding of how to build my Rust expertise which was the project objective. I also had practice writing cross platform code and exposure writing an API and documenting the API. I learned more about the Linux kernel, x86 architecture and GCC inline asm. I also learned how to manage a project myself and how to unblock myself and pivot when necessary.
 
+RGC future work include the following:
+- Optimizing the allocator
+- Getting better at Rust and bypassing the Rust allocator and directly mapping pages using system calls
+- Implement Rust unit testing for RGC 
+- Measuring RGC's performance
+- Concurrent garbage collection
