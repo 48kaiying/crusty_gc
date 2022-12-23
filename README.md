@@ -144,8 +144,32 @@ The following is a speculated pace of the project.
 
 ## Method 
 
-This project had a particularly rough start.
-// TODO: complete 
+### 1. The Dev Environment
+
+The first step of the project was to create a development environment. The set up is two fold. In order to run Rust code in a C project, first a C-friendly Rust API is required. Secondly, the Rust project must be linked to by the external build system. To prioritize being able to test end to end (running Rust calls from a C project), stub Rust commands were first created for purpose of testing the C API and ensuring that the Rust project was linked correctly. First, I edited the `cargo.toml` to emit a dynamic system library `rustgc` instead of a standard Rust target. I chose GCC as the default compiler for the C application and used the linker flags to link to the library. Next I created the C API using the Rust ABI and can be viewed in `src/lib.rs`. For every function in the Rust API, a corresponding header function in C is required (see file `c_app/src/rustgc.h`). To stream line everything, I wrote a build script `build_run.sh` which compiles the Rust library and then the C application which links to said library. For source of truth on this I referred to the [Rust docs](https://docs.rust-embedded.org/book/interoperability/rust-with-c.html). 
+
+### 2. The Naive Allocator 
+
+Now that I was able to build a Rust project and call Rust functions from C, I began on writing the actual garbage collector. The first part of garbage collection is creating an allocator. The allocator manages allocations in containers and implements the the `rgc_malloc` call. The goal is such that a user can request memory in C in the same way they would use `malloc`. But instead of having the C program allocate memory, the request would go through the Rust allocator. The purpose of this is so we are able to keep track of every heap allocation made by the user.
+
+Writing the allocator was the most difficult part for me and had many false starts. First, in order to create an allocator that would last the entire duration of the C project, I had to declare a global Allocator object. In Rust "global" variables are "static", however the Allocator isn't actually "static" it's mutable -- changes during execution time. This means a Rust type of `static mutable` was required. However, static mutable objects are not memory safe and the compiler through a big fuss. The solution was to use the `lazy_static` crate which allows initialization of static variable at runtime and wrapping the Allocator in a mutex since mutable static objects can not be safely passed between threads.
+
+Now that I had an Allocator I needed to implement `rgc_malloc`. I needed to be able to declare a chunk if memory in Rust, some how store a reference to that point in memory in an internal Rust structure, and then and pass a pointer to that chunk of memory back to the C program. Initially in the project proposal, I wanted to write an allocator that used Buddy allocation, thus the internal data structure I used was a linked list of `Blocks` which stored a `vec u8` (a `vec` us a Rust heap allocated array and `u8` means unsigned 8-bit integer). It turned out this was not the right move. While implementing enqueue and dequeue to the linked list was not terrible, implementing deletion in the middle of the array was strongly discouraged in Rust as there is no real way to this safely. After fighting this for a long time, I pivoted for time sake and used a vec of Blocks and side stepped Buddy allocation algorithm to finish the project. 
+
+Secondly, another big hurtle which I had to overcome was figuring out how to return the pointer back to C *and* store it in a Rust vec while making the compiler content. The vec memory which gets written to by the C program is referred to as the `payload` in my project. Thus, the internal data structure is a vec of vec pointers. There were two issues required resolution. First, a feature of Rust is that it de-allocates whenever a variable is no longer in scope, we do not want the `payload vec` to be deallocated after the `malloc` function finishes running. Secondly, the compiler does not allow us to store a `vec` pointer that is returned to the C program because the C program can modify the memory in unsafe ways (valid). The solution, after much research and discussing with a PhD student who knew rust was to use the Rust `Box` module which allowed me to turn the `vec` into a mutable pointer which could be returned (solving problem 2), and also calling `std::mem::forget` on said mutable pointer which tells the Rust compiler to not drop the payload memory when it goes out of scope. This process taught me a lot about Rust and also gave me a lot of pain since it felt like everything I was trying to do was not safe. At this point of the project, the progress had been slow and I wasn't sure if I would be able to achieve what I wanted using Rust.
+
+The last part of the allocator is implementing `rgc_free` which, after deciding to simplify the implementation to a vec, I iterate over the allocated blocks and look a `payload` which matched the pointer that was passed in. Using Rust `Box` method `Box::from_raw` and passing the payload pointer in, I was able to successfully allowed Rust to de-allocate the payload memory. Calling `from_raw` is unsafe, but this is the most straight forward way to do it so I just wrapped the call in `unsafe` brackets. 
+
+By the end of this section, I was able to allocate and de-allocate memory using the Rust allocator in C. 
+
+### 3. Heap to Heap References 
+
+Now that I am able to track and identify all heap allocations. 
+
+### 4. Root Memory to Heap References
+
+
+### 5. Finding Memory Leaks & Cleaning it Up
 
 ## Results
 
