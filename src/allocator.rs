@@ -405,7 +405,7 @@ impl Allocator {
 
     // Find leaked objects and garbage collect them
     pub fn find_mem_leaks(&mut self, hg: &HashMap<*mut u8, HashSet<*mut u8>>) {
-        println!("Finding memory leaks");
+        // println!("Finding memory leaks");
 
         // Get list of pure heap objects
         let mut heap_objs: HashSet<*mut u8> = HashSet::new();
@@ -435,7 +435,7 @@ impl Allocator {
         let mut garbage_size = 0;
         for leaked in heap_objs.difference(&visited) {
             println!(
-                "RGC SUMMARY: Heap object #{} leaked {:p} and cleaned",
+                "RGC: Heap object #{} leaked {:p} and cleaned",
                 leak_count, *leaked
             );
             // Free leaked block

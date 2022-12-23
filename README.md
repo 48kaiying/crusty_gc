@@ -118,13 +118,42 @@ The project is intended only to run for single threaded c programs on x86-64 Lin
 
 ## Evaluation Criteria
 
-Valgrind output of memory leaks running the same code with and without garbage collection. We should be able to compare the memory leak size difference and it should match the logging output of RGC. 
+Valgrind output of memory leaks running the same code with and without garbage collection. We should be able to compare the memory leak size difference and it should match the summary output of RGC. 
 
-The following is an example: 
+The following is an example of RGC output after it has identified `3126 bytes` of trash and collected it:
 
-// TODO: add logging
+```
+RGC: Heap object #1 leaked 0x556b9d356e80 and cleaned
+RGC: Heap object #2 leaked 0x556b9d356a40 and cleaned
+RGC: Heap object #3 leaked 0x556b9d3563e0 and cleaned
+RGC: Heap object #4 leaked 0x556b9d356c60 and cleaned
+RGC: Heap object #5 leaked 0x556b9d356820 and cleaned
+RGC: Heap object #6 leaked 0x556b9d356600 and cleaned
+RGC SUMMARY: Garbage collected 6 objects freeing 3126 bytes
+```
 
-// TODO: add valgrind output 
+When running Valgrind with and without `rgc_garbage_collect_nice()` call the leaked memory difference should match. 
+
+Valgrind with gc:
+```
+==6303== LEAK SUMMARY:
+==6303==    definitely lost: 0 bytes in 0 blocks
+==6303==    indirectly lost: 0 bytes in 0 blocks
+==6303==      possibly lost: 0 bytes in 0 blocks
+==6303==    still reachable: 6,786 bytes in 13 blocks
+==6303==         suppressed: 0 bytes in 0 blocks
+```
+
+Valgrind *without* gc should show an increase of the same size as RGC's summary. So 6,786 + 3,126 = 9,912. 
+```
+==6525== LEAK SUMMARY:
+==6525==    definitely lost: 0 bytes in 0 blocks
+==6525==    indirectly lost: 0 bytes in 0 blocks
+==6525==      possibly lost: 0 bytes in 0 blocks
+==6525==    still reachable: 9,912 bytes in 19 blocks
+==6525==         suppressed: 0 bytes in 0 blocks
+```
+
 
 # Project Timeline 
 
