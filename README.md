@@ -207,7 +207,13 @@ By the end of this section, I had also implemented logging which printed the con
 
 ### 4. Root Memory to Heap References
 
+Now that we know what heap objects point to other heap objects, we need to consider what else can point to a heap object? A global data structure or a local variable! By this point of the project, I could see that there was a trend. I needed to iterate over memory regions from a start address to and end address 8 bytes at a time looking for potential references modifying my heap graph. Thus, I refactored my code and wrote a `scan_region(...)` function which would do just that. 
 
+The parts of memory that are accessible by the user during execution is called root memory. This contains globals, stack (local variables), and registers. In a multi-threaded program we would also include thread stack and thread registers, but that is beyond the scope of this project.
+
+This was a tricky part of the project that required a lot of research, but not that much code. I needed to figure out how exactly the Linux kernel formats memory for a C program and how I could have access to the data and stack regions. Good thing there are a lot of manuals for this. 
+
+Reading [the Linux man page](https://linux.die.net/man/3/etext), I discovered that Unix systems declare symbols `etext` and `end` which contains the first address past the text segment (which is the start of the initialized data segment) and the first address pass the BSS data segment respectively. I need to declare these symbols in the C program in order to get the information. At this point I decided that RGC would be passed the `etext` and `end` addresses. While scanning this data region, I initially could not find any heap references for my test case. It wasn't until I looked more closely did I realize that`etext` was not always 8-byte aligned. Thus, I was iterating over the region misaligned. I am not sure about the correctness of this part, but to fix the issue I made sure that `etext` was an 8 byte aligned address and rounded down. This seemed to fix the issue and I began to see root references to heap objects in the heap graph. 
 
 ### 5. Finding Memory Leaks & Cleaning it Up
 
