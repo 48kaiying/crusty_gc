@@ -36,7 +36,6 @@ The project will make the following contributions:
 - Provide a public reference for writing a Rust garbage collector for C. 
 - Motivate understanding of memory management
 
-
 ## Design Goals
 
 This project is of interest to people who want to learn about Rust, garbage collection, memory leak detection, and memory management. The audience will benefit from being able to write their own RGC and to use this one to collect garbage in a naive single threaded C program. 
@@ -224,6 +223,8 @@ With this graph of heap references, I was finally able to find memory leaks to c
 Since `rgc_free` was already implemented, cleaning up the garbage was iterating over all the leaked objects and calling the method on the payload. This also removed the allocator block to it.
 
 ## Conclusion & Future Work
+
+For the final RGC C-API, please see this file [rustgc.h](https://github.com/48kaiying/crusty_gc/blob/master/c_app/src/rustgc.h)
 
 In the end, I was able to complete the goal I had in mind even though it was not easy and not exactly how I planned. I feel comfortable writing Rust now and have a good understanding of how to build my Rust expertise which was the project objective. I also had practice writing cross platform code and exposure writing an API and documenting the API. I learned more about the Linux kernel, x86 architecture and GCC inline asm. I also learned how to manage a project myself and how to unblock myself and pivot when necessary.
 

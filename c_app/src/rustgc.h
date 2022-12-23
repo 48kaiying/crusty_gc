@@ -1,11 +1,6 @@
 #include <stdio.h>
 
-// Functions called in the Rust library
-extern void rgc_init();
-extern void rgc_cleanup();
-extern char *rgc_malloc(unsigned long);
-extern void rgc_free(char *);
-extern void rgc_garbage_collect(char *, char *, char *, char *);
+// The following is used by RGC please scroll for the actual API calls
 
 // This is the first address past the end of the text segment (the program code).
 extern char etext;
@@ -61,6 +56,25 @@ static __always_inline void rgc_stack_bottom(unsigned long *stack_bottom)
     fclose(fp);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Initialize RGC
+extern void rgc_init();
+
+// Clean up RGC at the end of the program
+extern void rgc_cleanup();
+
+// Allocate memory using RGC just as you would with malloc
+extern char *rgc_malloc(unsigned long size);
+
+// Explicitly free memory
+extern void rgc_free(char *pointer);
+
+// Request RGC to garbage collect passing in the etext, end, stack_start, and stack_end
+// It is recommended to use rgc_garbage_collect_nice() instead.
+extern void rgc_garbage_collect(char *etext, char *end, char *stack_start, char *stack_end);
+
+// Request RGC to garbage collect
 static __attribute_noinline__ void rgc_garbage_collect_nice()
 {
     // Size of long is 8 bytes
