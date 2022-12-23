@@ -142,7 +142,7 @@ The following is a speculated pace of the project.
 - Flesh out garbage collection data by collecting runtime type information and displaying to user 
 - Optimize the memory allocator
 
-## Method 
+## Method & Results
 
 ### 1. The Dev Environment
 
@@ -154,7 +154,7 @@ Now that I was able to build a Rust project and call Rust functions from C, I be
 
 Writing the allocator was the most difficult part for me and had many false starts. First, in order to create an allocator that would last the entire duration of the C project, I had to declare a global Allocator object. In Rust "global" variables are "static", however the Allocator isn't actually "static" it's mutable -- changes during execution time. This means a Rust type of `static mutable` was required. However, static mutable objects are not memory safe and the compiler through a big fuss. The solution was to use the `lazy_static` crate which allows initialization of static variable at runtime and wrapping the Allocator in a mutex since mutable static objects can not be safely passed between threads.
 
-Now that I had an Allocator I needed to implement `rgc_malloc`. I needed to be able to declare a chunk if memory in Rust, some how store a reference to that point in memory in an internal Rust structure, and then and pass a pointer to that chunk of memory back to the C program. Initially in the project proposal, I wanted to write an allocator that used Buddy allocation, thus the internal data structure I used was a linked list of `Blocks` which stored a `vec u8` (a `vec` us a Rust heap allocated array and `u8` means unsigned 8-bit integer). It turned out this was not the right move. While implementing enqueue and dequeue to the linked list was not terrible, implementing deletion in the middle of the array was strongly discouraged in Rust as there is no real way to this safely. After fighting this for a long time, I pivoted for time sake and used a vec of Blocks and side stepped Buddy allocation algorithm to finish the project. 
+Now that I had an Allocator I needed to implement `rgc_malloc`. I needed to be able to declare a chunk if memory in Rust, some how store a reference to that point in memory in an internal Rust structure, and then and pass a pointer to that chunk of memory back to the C program. Initially in the project proposal, I wanted to write an allocator that used Buddy allocation, thus the internal data structure I used was a linked list of `Block` which stores the requested allocation size and a `vec u8` (a `vec` us a Rust heap allocated array and `u8` means unsigned 8-bit integer). It turned out this was not the right move. While implementing enqueue and dequeue to the linked list was not terrible, implementing deletion in the middle of the array was strongly discouraged in Rust as there is no real way to this safely. After fighting this for a long time, I pivoted for time sake and used a vec of Blocks and side stepped Buddy allocation algorithm to finish the project. 
 
 Secondly, another big hurtle which I had to overcome was figuring out how to return the pointer back to C *and* store it in a Rust vec while making the compiler content. The vec memory which gets written to by the C program is referred to as the `payload` in my project. Thus, the internal data structure is a vec of vec pointers. There were two issues required resolution. First, a feature of Rust is that it de-allocates whenever a variable is no longer in scope, we do not want the `payload vec` to be deallocated after the `malloc` function finishes running. Secondly, the compiler does not allow us to store a `vec` pointer that is returned to the C program because the C program can modify the memory in unsafe ways (valid). The solution, after much research and discussing with a PhD student who knew rust was to use the Rust `Box` module which allowed me to turn the `vec` into a mutable pointer which could be returned (solving problem 2), and also calling `std::mem::forget` on said mutable pointer which tells the Rust compiler to not drop the payload memory when it goes out of scope. This process taught me a lot about Rust and also gave me a lot of pain since it felt like everything I was trying to do was not safe. At this point of the project, the progress had been slow and I wasn't sure if I would be able to achieve what I wanted using Rust.
 
@@ -164,18 +164,54 @@ By the end of this section, I was able to allocate and de-allocate memory using 
 
 ### 3. Heap to Heap References 
 
-Now that I am able to track and identify all heap allocations. 
+Now that I am able to track and identify all heap allocations, the next step is identifying what is garbage. Garbage is any heap allocation that can not be reference to by the user during the program execution point. Thus, we need to be able to know what heap allocations have references to it.
+
+What can point to a heap allocation? Well, another heap allocation! This is the case for instance, when we allocate a `struct A` which stores a pointer to another heap allocated `struct B`. See the following test case `test_heap_graph()` in `c_app/application.c` which contains a heap allocated `Point_container` which itself stores five pointers to heap allocated `Point` structs. 
+
+```c
+typedef struct Point_container
+{
+    struct Point *first;
+    struct Point *sec;
+    struct Point *third;
+    struct Point *fourth;
+    struct Point *fifth;
+} Point_container;
+
+void test_heap_graph()
+{
+    Point_container *pc = (Point_container *)rgc_malloc(sizeof(Point_container));
+    ...
+}
+
+void fill_point_container(Point_container *pc)
+{
+    Point *first = (Point *)rgc_malloc(sizeof(Point));
+    Point *sec = (Point *)rgc_malloc(sizeof(Point));
+    Point *tri = (Point *)rgc_malloc(sizeof(Point));
+    Point *four = (Point *)rgc_malloc(sizeof(Point));
+    Point *fifth = (Point *)rgc_malloc(sizeof(Point));
+    ...
+}
+```
+
+The implementation for finding heap references is in the `create_heap_graph(...)` method in Rust allocator. The algorithm is as follows: for every allocated Block, iterate over the contents of the `payload vec` 8 bytes at a time and treat every 8 bytes as a pointer (a memory address). In 64-bit a pointer is quadword (8 bytes) which is why we iterate 8 bytes at a time. This pointer is called a potential reference. A potential reference is an *actual* reference when the address is between another heap object address and the heap object address + allocation size. This addresses the case where a heap object can reference the middle of another heap object. 
+
+Implementing this was kind of meta since in Rust, I store the 8 byte contents in a local potential reference `pref` variable, so in order to actually read the right address, I needed to dereference pref due to the way Rust iterators work. This was a nuance that took some time to figure out and for a while the results were not matching up. 
+
+For implementation, the heap graph is a `HashMap` which uses a heap object pointer as the key and a `HashSet` of other heap objects as the value. When a heap object `A` referred to heap object `B` then the pointer for `B` is added to the HashSet value at key `A`. 
+
+By the end of this section, I had also implemented logging which printed the contents of the heap graph and saw the expected outcome - there is a heap allocation (the point container) which contains 5 other heap references (the points). 
+
+// TODO: run and add logging 
 
 ### 4. Root Memory to Heap References
 
 
+
 ### 5. Finding Memory Leaks & Cleaning it Up
-
-## Results
-
-// TODO: add results
 
 ## Conclusion & Future Work
 
-In the end, I was able to complete the goal I had in mind. 
+In the end, I was able to complete the goal I had in mind even though it was not exactly how I planned. I learned a lot of Rust, more about memory, 
 
